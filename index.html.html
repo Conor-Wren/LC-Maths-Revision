@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en-IE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Name That Question</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:wght@400;500;600;700&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+:root {
+  /* Exam-hall paper and ink; strand colours mark Algebra I, Algebra II and Trigonometry */
+  --paper: #F4F5F1;
+  --card: #FFFFFF;
+  --ink: #17202B;
+  --muted: #56606C;
+  --line: #D8DCD6;
+  --accent: #1F6F5C;
+  --accent-ink: #FFFFFF;
+  --a1: #2F43A6; --a2: #0E7468; --tr: #A8441A;
+  --good: #1D7A3A; --good-bg: #E3F3E7;
+  --bad: #B42D24; --bad-bg: #FBE5E3;
+  --star: #C98A00;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --math: "STIX Two Text", "Cambria Math", Georgia, serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12171D; --card: #1B222A; --ink: #EEF1EC; --muted: #A9B2BC; --line: #33404B;
+    --accent: #4FB89B; --accent-ink: #0D1A16;
+    --a1: #8C9BEF; --a2: #4FB89B; --tr: #EE9466;
+    --good: #6FD08E; --good-bg: #183324; --bad: #F08A80; --bad-bg: #3A1D1B; --star: #F2C14E;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12171D; --card: #1B222A; --ink: #EEF1EC; --muted: #A9B2BC; --line: #33404B;
+  --accent: #4FB89B; --accent-ink: #0D1A16;
+  --a1: #8C9BEF; --a2: #4FB89B; --tr: #EE9466;
+  --good: #6FD08E; --good-bg: #183324; --bad: #F08A80; --bad-bg: #3A1D1B; --star: #F2C14E;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.5; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 48px; display: flex; flex-direction: column; gap: 18px; }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 22px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+.brand .dot { width: 14px; height: 14px; border-radius: 50%; background: conic-gradient(var(--a1) 0 33%, var(--a2) 0 66%, var(--tr) 0); }
+.nav { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1.5px solid var(--line); background: var(--card); padding: 9px 16px; border-radius: 10px; font-weight: 600; font-size: 15px; }
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.big { padding: 13px 22px; font-size: 17px; border-radius: 12px; }
+.btn[disabled] { opacity: 0.45; cursor: default; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 800; line-height: 1.05; }
+h2 { font-size: 24px; font-weight: 800; }
+h3 { font-size: 18px; font-weight: 600; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+
+/* home */
+.hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; align-items: start; }
+.hero p.lead { font-size: 18px; max-width: 58ch; margin-top: 10px; }
+.decks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.deck { text-align: left; border: 2px solid var(--line); background: var(--card); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.deck[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.deck .count { font-family: var(--display); font-size: 40px; font-weight: 800; line-height: 1; }
+.deck .bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; }
+.stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.stagecard { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--card); display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.stagecard .n { font-family: var(--display); font-weight: 800; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.stagecard[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+.fade { display: flex; gap: 3px; margin-top: 4px; }
+.fade i { flex: 1; height: 5px; border-radius: 3px; background: var(--accent); }
+.fade i.off { background: var(--line); }
+
+/* play */
+.playbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.steps { display: flex; gap: 6px; }
+.steps span { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); background: var(--card); }
+.steps span.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.steps span.done { color: var(--good); border-color: var(--good); }
+.progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.progress > i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+.score { font-variant-numeric: tabular-nums; font-weight: 700; }
+.qcard { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px; display: flex; flex-direction: column; gap: 16px; position: relative; }
+.qcard .label { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
+.qtext { font-family: var(--math); font-size: clamp(21px, 2.6vw, 27px); line-height: 1.55; }
+.graph { max-width: 420px; width: 100%; align-self: center; }
+.graph svg { width: 100%; height: auto; display: block; }
+.clue { border: 1.5px dashed var(--accent); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--accent) 7%, var(--card)); font-size: 16px; }
+.clue b { color: var(--accent); }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.opt { text-align: left; border: 2px solid var(--line); background: var(--card); border-radius: 12px; padding: 12px 14px; font-weight: 600; font-size: 16px; display: flex; gap: 10px; align-items: center; min-height: 54px; }
+.opt:hover:not([disabled]) { border-color: var(--ink); }
+.opt .k { flex: none; width: 26px; height: 26px; border-radius: 7px; background: var(--paper); border: 1px solid var(--line); font-size: 13px; display: grid; place-items: center; color: var(--muted); }
+.opt .sw { flex: none; width: 8px; align-self: stretch; border-radius: 4px; }
+.opt.right { border-color: var(--good); background: var(--good-bg); }
+.opt.wrong { border-color: var(--bad); background: var(--bad-bg); }
+.opt[disabled] { cursor: default; }
+.allgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.allgrid .col { display: flex; flex-direction: column; gap: 7px; }
+.allgrid .col h3 { font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.allgrid .opt { min-height: 44px; padding: 8px 12px; font-size: 15px; }
+.feedback { border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.feedback.good { background: var(--good-bg); }
+.feedback.bad { background: var(--bad-bg); }
+.feedback .verdict { font-family: var(--display); font-weight: 800; font-size: 20px; }
+.feedback.good .verdict { color: var(--good); }
+.feedback.bad .verdict { color: var(--bad); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.solution { border-top: 1px solid var(--line); padding-top: 12px; font-family: var(--math); font-size: 19px; display: flex; flex-direction: column; gap: 4px; }
+.solution .ans { font-weight: 600; margin-top: 4px; }
+.solution .ans::before { content: "Answer: "; font-family: var(--body); font-size: 14px; font-weight: 700; color: var(--accent); }
+.starbtn[aria-pressed="true"] { border-color: var(--star); color: var(--star); }
+.timer { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.timer > i { display: block; height: 100%; background: var(--star); width: 100%; }
+.typechip { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+.typechip i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+/* summary + lists */
+.sumgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.tile .big { font-family: var(--display); font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.item { background: var(--card); border: 1px solid var(--line); border-left-width: 6px; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.item .meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+.item .qt { font-family: var(--math); font-size: 19px; }
+.mark { font-weight: 700; font-size: 14px; padding: 2px 8px; border-radius: 999px; }
+.mark.ok { background: var(--good-bg); color: var(--good); }
+.mark.no { background: var(--bad-bg); color: var(--bad); }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 12px; font-size: 14px; font-weight: 600; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 15px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.toast.on { opacity: 1; }
+
+/* maths */
+.fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.1; margin: 0 2px; font-size: 0.85em; }
+.fr > span:first-child { border-bottom: 1px solid currentColor; padding: 0 3px 1px; }
+.fr > span:last-child { padding: 1px 3px 0; }
+.sq { white-space: nowrap; }
+.sq > span { border-top: 1px solid currentColor; padding-top: 1px; margin-left: 1px; }
+sup, sub { line-height: 0; font-size: 0.7em; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; }
+  .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .decks { grid-template-columns: 1fr; }
+  .qcard { padding: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="dot" aria-hidden="true"></span>Name That Question</div>
+    <nav class="nav" aria-label="Sections">
+      <button class="btn" id="nav-home" type="button">Home</button>
+      <button class="btn" id="nav-library" type="button">Problem library</button>
+      <button class="btn" id="nav-practice" type="button">Practice list (<span id="pcount">0</span>)</button>
+    </nav>
+  </header>
+  <main id="view" aria-live="polite"></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// ---------- maths helpers ----------
+const F = (n, d) => `<span class="fr"><span>${n}</span><span>${d}</span></span>`;
+const R = (x) => `<span class="sq">√<span>${x}</span></span>`;
+const s2 = "²", s3 = "³", s4 = "⁴";
+
+// ---------- question types ----------
+const TYPES = [
+  { id: "binom", ch: "Algebra I", name: "Binomial Expansions",
+    clue: "A bracket raised to a power, such as (a + b)ⁿ, with words like “term independent of x”, “coefficient of xᵏ” or “first three terms”.",
+    first: "Write the general term T<sub>r+1</sub> = <sup>n</sup>C<sub>r</sub> a<sup>n−r</sup> b<sup>r</sup>.",
+    conf: ["ident", "cubes", "subst"] },
+  { id: "ident", ch: "Algebra I", name: "Algebraic Identities",
+    clue: "The ≡ sign or “for all values of x”: two forms of the same expression, with unknown letters to match.",
+    first: "Expand one side fully, then equate coefficients of matching powers.",
+    conf: ["factor", "frac", "cts", "cubes"] },
+  { id: "frac", ch: "Algebra I", name: "Algebraic Fractions",
+    clue: "x in a denominator: “single fraction”, “simplify”, an equation with fractions, or A/(x − 1) + B/(x + 2).",
+    first: "Factorise everything, find the LCD, then combine or multiply through.",
+    conf: ["ident", "surd", "subst"] },
+  { id: "triple", ch: "Algebra I", name: "Triple Simultaneous Equations",
+    clue: "Three unknowns (x, y, z or a, b, c) with three equations, or a story with three unknown amounts.",
+    first: "Label the equations ①②③ and eliminate the same variable from two pairs.",
+    conf: ["graphs", "nonlin"] },
+  { id: "cubes", ch: "Algebra I", name: "Factorisation & Cubes",
+    clue: "A cube term (8a³, 27x³, x⁶) plus or minus a number, or “factorise fully”.",
+    first: "Take out the HCF, then write each term as a cube: a³ ± b³ = (a ± b)(a² ∓ ab + b²).",
+    conf: ["factor", "ident", "binom"] },
+  { id: "surd", ch: "Algebra II", name: "Surd Equations",
+    clue: "The unknown is inside a square root sign.",
+    first: "Isolate a surd, square both sides, and check every answer at the end.",
+    conf: ["subst", "frac", "nonlin"] },
+  { id: "cts", ch: "Algebra II", name: "Completing the Square",
+    clue: "“In the form (x + p)² + q” or a(x + h)² + k, a minimum or maximum value, or “by completing the square”.",
+    first: "Take out a, halve the x-coefficient, square it and subtract it.",
+    conf: ["disc", "graphs", "ident"] },
+  { id: "factor", ch: "Algebra II", name: "Factor Theorem",
+    clue: "A cubic with “is a factor”, “show that (x − k) is a factor”, or unknown coefficients in a cubic.",
+    first: "Substitute the root into f(x) and set f(k) = 0.",
+    conf: ["cubes", "ident", "graphs"] },
+  { id: "nonlin", ch: "Algebra II", name: "Non-linear Simultaneous Equations",
+    clue: "One linear equation and one with squares (a line and a curve or circle): “points of intersection”.",
+    first: "Make x or y the subject of the linear equation and substitute into the other.",
+    conf: ["disc", "triple", "surd"] },
+  { id: "graphs", ch: "Algebra II", name: "Creating Equations from Graphs",
+    clue: "A graph, or its roots and turning point, is given and you must find the equation.",
+    first: "Write y = k(x − r₁)(x − r₂)… from the roots, then use another point to find k.",
+    conf: ["triple", "factor", "cts", "tgraph"] },
+  { id: "disc", ch: "Algebra II", name: "The Discriminant",
+    clue: "“Equal roots”, “real roots”, “no real roots”, “distinct”, a tangent, or a range of values of k.",
+    first: "Identify a, b and c, then write b² − 4ac = 0, > 0 or < 0.",
+    conf: ["nonlin", "cts", "factor"] },
+  { id: "subst", ch: "Algebra II", name: "The Substitution Method",
+    clue: "A hidden quadratic: x⁴ with x², 2²ˣ with 2ˣ, or the same bracket appearing twice.",
+    first: "Let u equal the repeated expression, solve the quadratic in u, then go back to x.",
+    conf: ["surd", "binom", "solve"] },
+  { id: "rad", ch: "Trigonometry", name: "Radians, Arc Length & Sector Area",
+    clue: "Radians or π, “arc length”, “sector”, or converting between degrees and radians.",
+    first: "Use l = rθ or A = ½r²θ with θ in radians.",
+    conf: ["tgraph", "right", "rules"] },
+  { id: "right", ch: "Trigonometry", name: "Right-angled Triangles",
+    clue: "A right angle: angles of elevation or depression, ladders, ramps, or exact values of sin, cos and tan.",
+    first: "Label O, A and H, then choose sin, cos or tan.",
+    conf: ["threeD", "rules", "rad"] },
+  { id: "solve", ch: "Trigonometry", name: "Solving Trig Equations",
+    clue: "“Solve” with sin, cos or tan of the unknown over a domain such as 0° ≤ x ≤ 360°, or “general solution”.",
+    first: "Find the reference angle, use CAST for the quadrants, and extend the range for multiple angles.",
+    conf: ["tgraph", "subst", "right"] },
+  { id: "tgraph", ch: "Trigonometry", name: "Graphs of Trig Functions",
+    clue: "Period, range, amplitude, or a sketch or graph of a sin or cos curve.",
+    first: "Period = 2π/b; range is [a − b, a + b]; midline y = a.",
+    conf: ["solve", "rad", "graphs"] },
+  { id: "proof", ch: "Trigonometry", name: "Proofs of the Sine & Cosine Rules",
+    clue: "“Prove” together with the sine rule or the cosine rule.",
+    first: "Draw the diagram: a perpendicular from C (sine rule) or C = (b cos A, b sin A) (cosine rule).",
+    conf: ["rules", "right"] },
+  { id: "rules", ch: "Trigonometry", name: "Sine, Cosine & Area Rules",
+    clue: "A triangle with no right angle: two sides and an angle, three sides, an area, or “two possible values”.",
+    first: "Side and opposite angle known → sine rule; two sides and the included angle, or three sides → cosine rule.",
+    conf: ["right", "threeD", "proof"] },
+  { id: "threeD", ch: "Trigonometry", name: "3D Problems",
+    clue: "A solid or several planes: a pyramid, cuboid, or a mast with points on the ground in different directions.",
+    first: "Pull out each right-angled triangle and redraw it flat; find the shared side first.",
+    conf: ["right", "rules"] },
+];
+
+// ---------- graph specs (drawn as inline SVG by the page) ----------
+const G = {
+  q1: { f: (x) => (x + 2) * (x - 4), x: [-3.5, 5.5], y: [-10, 8], pts: [[-2, 0, "−2"], [4, 0, "4"], [0, -8, "(0, −8)"]] },
+  c1: { f: (x) => (x + 1) * (x - 2) ** 2, x: [-2, 3.6], y: [-4, 7], pts: [[-1, 0, "−1"], [2, 0, "2"], [0, 4, "(0, 4)"]] },
+  c2: { f: (x) => (x + 1) * (x - 2) * (x - 4), x: [-2, 5], y: [-8, 12], pts: [[-1, 0, "−1"], [2, 0, "2"], [4, 0, "4"], [0, 8, "(0, 8)"]] },
+  q2: { f: (x) => 2 * x * x - 4 * x - 6, x: [-2.5, 4.5], y: [-9, 8], pts: [[-1, 0, "−1"], [3, 0, "3"], [0, -6, "(0, −6)"]] },
+  t1: { f: (x) => 1 + 2 * Math.cos(3 * x), x: [0, 2 * Math.PI], y: [-1.6, 3.6], trig: true },
+  t2: { f: (x) => 1 + 3 * Math.sin(2 * x), x: [0, 2 * Math.PI], y: [-2.6, 4.6], trig: true },
+  p3: { f: (x) => x * x - 3 * x + 6, x: [-2, 4.5], y: [-1, 12], pts: [[-1, 10, "A(−1, 10)"], [1, 4, "B(1, 4)"], [2, 4, "C(2, 4)"]] },
+};
+
+// ---------- problems ----------
+// t: type, q: question, s: solution lines, a: answer, g: graph, also: other acceptable types
+const PROBLEMS = [
+/* Binomial */
+{ t: "binom", q: `Expand (2 − x)${s4} fully, simplifying each term.`,
+  s: ["Pascal’s row 1, 4, 6, 4, 1 with a = 2, b = −x", `2${s4} + 4(2${s3})(−x) + 6(2${s2})(−x)${s2} + 4(2)(−x)${s3} + (−x)${s4}`], a: `16 − 32x + 24x${s2} − 8x${s3} + x${s4}` },
+{ t: "binom", q: `Find the coefficient of x${s4} in the expansion of (3x − ${F("2", "x")})<sup>8</sup>.`,
+  s: [`T<sub>r+1</sub> = <sup>8</sup>C<sub>r</sub> 3<sup>8−r</sup>(−2)<sup>r</sup> x<sup>8−2r</sup>`, "8 − 2r = 4 ⇒ r = 2", `<sup>8</sup>C<sub>2</sub> × 3<sup>6</sup> × 4 = 28 × 729 × 4`], a: "81 648" },
+{ t: "binom", q: `The first three terms in the expansion of (1 + kx)<sup>n</sup> are 1 + 12x + 60x${s2}. Find n and k.`,
+  s: ["nk = 12 and n(n − 1)k²/2 = 60 ⇒ n(n − 1)k² = 120", "Divide by (nk)² = 144: (n − 1)/n = 5/6 ⇒ n = 6", "k = 12/6 = 2"], a: "n = 6, k = 2" },
+{ t: "binom", q: `Find the term independent of x in the expansion of (x${s2} + ${F("2", "x")})<sup>6</sup>.`,
+  s: [`T<sub>r+1</sub> = <sup>6</sup>C<sub>r</sub> 2<sup>r</sup> x<sup>12−3r</sup>`, "12 − 3r = 0 ⇒ r = 4", `<sup>6</sup>C<sub>4</sub> × 2${s4} = 15 × 16`], a: "240" },
+{ t: "binom", q: `Write down the first three terms in the expansion of (1 + 2x)<sup>5</sup>.`,
+  s: [`<sup>5</sup>C<sub>0</sub> = 1, <sup>5</sup>C<sub>1</sub>(2x) = 10x, <sup>5</sup>C<sub>2</sub>(2x)${s2} = 10(4x${s2})`], a: `1 + 10x + 40x${s2}` },
+
+/* Identities */
+{ t: "ident", q: `Find a and b if (x + a)${s2} + b ≡ x${s2} − 10x + 31 for all values of x.`,
+  s: [`x${s2} + 2ax + a${s2} + b`, "x: 2a = −10 ⇒ a = −5", "constant: 25 + b = 31 ⇒ b = 6"], a: "a = −5, b = 6", also: ["cts"] },
+{ t: "ident", q: `Find p, q and r if 2x${s3} + px${s2} + 11x − 6 ≡ (2x − 1)(x${s2} + qx + r).`,
+  s: [`RHS = 2x${s3} + (2q − 1)x${s2} + (2r − q)x − r`, "−r = −6 ⇒ r = 6", "2r − q = 11 ⇒ q = 1", "p = 2q − 1 = 1"], a: "p = 1, q = 1, r = 6" },
+{ t: "ident", q: `Find a, b and c if (x − 2)(ax${s2} + bx + c) ≡ 3x${s3} − 4x${s2} − 5x + 2 for all x.`,
+  s: [`LHS = ax${s3} + (b − 2a)x${s2} + (c − 2b)x − 2c`, "a = 3; b − 6 = −4 ⇒ b = 2; c − 4 = −5 ⇒ c = −1", "Check: −2c = 2 ✓"], a: "a = 3, b = 2, c = −1" },
+{ t: "ident", q: `Find p and q if x${s2} + px + 5 ≡ (x − 3)${s2} + q for all values of x.`,
+  s: [`(x − 3)${s2} + q = x${s2} − 6x + 9 + q`, "p = −6; 9 + q = 5 ⇒ q = −4"], a: "p = −6, q = −4", also: ["cts"] },
+{ t: "ident", q: `If (x − a)${s2} is a factor of x${s3} + px + q, prove that 4p${s3} + 27q${s2} = 0.`,
+  s: [`No x² term, so the third factor is (x + 2a)`, `(x − a)${s2}(x + 2a) = x${s3} − 3a${s2}x + 2a${s3}`, "p = −3a², q = 2a³", "4(−27a⁶) + 27(4a⁶) = 0"], a: "Shown", also: ["factor"] },
+
+/* Fractions */
+{ t: "frac", q: `Express ${F("3", "x − 2")} − ${F("2", "x + 3")} as a single fraction.`,
+  s: ["LCD = (x − 2)(x + 3)", "3(x + 3) − 2(x − 2) = x + 13"], a: `${F("x + 13", "(x − 2)(x + 3)")}` },
+{ t: "frac", q: `Solve ${F("x", "x − 2")} − ${F("3", "x + 1")} = 1.`,
+  s: ["× (x − 2)(x + 1): x(x + 1) − 3(x − 2) = (x − 2)(x + 1)", `x${s2} − 2x + 6 = x${s2} − x − 2 ⇒ x = 8`], a: "x = 8" },
+{ t: "frac", q: `Simplify fully ${F(`2x${s2} − 8`, `x${s2} − x − 6`)}.`,
+  s: [`Top: 2(x − 2)(x + 2); bottom: (x − 3)(x + 2)`, "Cancel (x + 2)"], a: `${F("2(x − 2)", "x − 3")}` },
+{ t: "frac", q: `Solve ${F("3", "x + 1")} + ${F("2", "x − 1")} = 1.`,
+  s: ["× (x + 1)(x − 1): 3(x − 1) + 2(x + 1) = x² − 1", "5x − 1 = x² − 1 ⇒ x(x − 5) = 0"], a: "x = 0 or x = 5" },
+{ t: "frac", q: `Find A and B such that ${F("5x + 1", "(x − 1)(x + 2)")} ≡ ${F("A", "x − 1")} + ${F("B", "x + 2")}.`,
+  s: ["5x + 1 ≡ A(x + 2) + B(x − 1)", "x = 1: 6 = 3A ⇒ A = 2", "x = −2: −9 = −3B ⇒ B = 3"], a: "A = 2, B = 3", also: ["ident"] },
+
+/* Triple */
+{ t: "triple", q: `Solve: x + y + z = 6,  2x + y − z = 1,  x − y + 2z = 5.`,
+  s: ["① + ②: 3x + 2y = 7", "2×② + ③: 5x + y = 7", "Solve: x = 1, y = 2; then z = 3"], a: "x = 1, y = 2, z = 3" },
+{ t: "triple", q: `Solve: 2x + 3y − z = −2,  3x − 2y + 2z = 14,  5x + 4y − 3z = −3.`,
+  s: ["2×① + ②: 7x + 4y = 10", "③ − 3×①: −x − 5y = 3", "Solve: y = −1, x = 2; z = 2x + 3y + 2 = 3"], a: "x = 2, y = −1, z = 3" },
+{ t: "triple", q: `A cinema sold 50 tickets: adult €12, child €7 and student €9. Takings were €495 and the number of adult tickets equalled the child and student tickets combined. How many of each were sold?`,
+  s: ["a + c + s = 50, 12a + 7c + 9s = 495, a = c + s", "a = 25, c + s = 25", "7c + 9s = 195 ⇒ c = 15, s = 10"], a: "25 adult, 15 child, 10 student" },
+{ t: "triple", q: `Solve: x + 2y − z = 3,  2x − y + z = 4,  3x + y + 2z = 9.`,
+  s: ["① + ②: 3x + y = 7", "③ − 2×②: −x + 3y = 1", "x = 2, y = 1; then z = 1"], a: "x = 2, y = 1, z = 1" },
+{ t: "triple", q: `A quadratic y = ax${s2} + bx + c passes through the points shown. Find a, b and c.`, g: "p3",
+  s: ["a − b + c = 10, a + b + c = 4, 4a + 2b + c = 4", "2b = −6 ⇒ b = −3; a + c = 7; 4a + c = 10", "a = 1, c = 6"], a: `y = x${s2} − 3x + 6`, also: ["graphs"] },
+
+/* Cubes */
+{ t: "cubes", q: `Factorise 8a${s3} + 125.`,
+  s: [`(2a)${s3} + 5${s3}`, "a³ + b³ = (a + b)(a² − ab + b²)"], a: `(2a + 5)(4a${s2} − 10a + 25)` },
+{ t: "cubes", q: `Factorise fully 3x${s4} − 24x.`,
+  s: [`HCF: 3x(x${s3} − 8)`, "Difference of two cubes"], a: `3x(x − 2)(x${s2} + 2x + 4)` },
+{ t: "cubes", q: `Given x + y = 5 and xy = 3, find x${s3} + y${s3} without finding x or y.`,
+  s: [`x${s3} + y${s3} = (x + y)${s3} − 3xy(x + y)`, "= 125 − 45"], a: "80", also: ["ident"] },
+{ t: "cubes", q: `Factorise 27x${s3} − 8.`,
+  s: [`(3x)${s3} − 2${s3}`, "a³ − b³ = (a − b)(a² + ab + b²)"], a: `(3x − 2)(9x${s2} + 6x + 4)` },
+{ t: "cubes", q: `Factorise fully x<sup>6</sup> − 64.`,
+  s: [`Difference of squares first: (x${s3} − 8)(x${s3} + 8)`, "Then a difference and a sum of cubes"], a: `(x − 2)(x + 2)(x${s2} + 2x + 4)(x${s2} − 2x + 4)` },
+
+/* Surds */
+{ t: "surd", q: `Solve ${R("3x + 4")} = x.`,
+  s: [`3x + 4 = x${s2} ⇒ (x − 4)(x + 1) = 0`, "Check: x = −1 gives 1 ≠ −1 ✗"], a: "x = 4" },
+{ t: "surd", q: `Solve ${R("5x + 1")} − ${R("x + 1")} = 2.`,
+  s: [`${R("5x + 1")} = 2 + ${R("x + 1")}; square: x − 1 = ${R("x + 1")}`, `Square again: x${s2} − 3x = 0 ⇒ x = 0 or 3`, "Check: x = 0 gives 0 ≠ 2 ✗"], a: "x = 3" },
+{ t: "surd", q: `Solve ${R("2x + 5")} + ${R("x + 2")} = ${R("5x + 11")}.`,
+  s: [`Square: ${R("(2x + 5)(x + 2)")} = x + 2`, "Square: (x + 2)(x + 3) = 0", "x = −3 gives √(−1): not real ✗"], a: "x = −2" },
+{ t: "surd", q: `Solve x − ${R("x + 7")} = 5.`,
+  s: [`x − 5 = ${R("x + 7")} ⇒ x${s2} − 11x + 18 = 0`, "x = 9 or 2; x = 2 gives −1 ≠ 5 ✗"], a: "x = 9" },
+{ t: "surd", q: `Solve ${R("2x + 6")} − ${R("x + 4")} = 1.`,
+  s: [`Isolate and square: x + 1 = 2${R("x + 4")}`, `Square: x${s2} − 2x − 15 = 0 ⇒ x = 5 or −3`, "x = −3 gives −1 ≠ 1 ✗"], a: "x = 5" },
+
+/* Completing the square */
+{ t: "cts", q: `Write x${s2} + 8x + 21 in the form (x + p)${s2} + q and state the minimum value.`,
+  s: ["Half of 8 is 4: (x + 4)² − 16 + 21"], a: `(x + 4)${s2} + 5; minimum 5 at x = −4` },
+{ t: "cts", q: `Write −3x${s2} + 12x + 5 in the form a(x + h)${s2} + k and state the maximum point.`,
+  s: ["−3(x² − 4x) + 5 = −3[(x − 2)² − 4] + 5"], a: `−3(x − 2)${s2} + 17; max (2, 17)` },
+{ t: "cts", q: `By completing the square, solve 2x${s2} − 8x + 3 = 0, giving answers in surd form.`,
+  s: ["2(x − 2)² − 5 = 0 ⇒ (x − 2)² = 5/2", `x − 2 = ±${R("10")}/2`], a: `x = 2 ± ${F(R("10"), "2")}` },
+{ t: "cts", q: `Write g(x) = 2x${s2} − 12x + 23 in the form a(x − h)${s2} + k and explain why g(x) > 0 for all x.`,
+  s: ["2(x² − 6x) + 23 = 2(x − 3)² − 18 + 23", "A square is never negative, so g(x) ≥ 5"], a: `2(x − 3)${s2} + 5; minimum 5 > 0` },
+{ t: "cts", q: `By completing the square on ax${s2} + bx + c = 0, derive the quadratic formula.`,
+  s: ["÷ a; (x + b/2a)² = (b² − 4ac)/4a²", "Square root and subtract b/2a"], a: `x = ${F(`−b ± ${R("b² − 4ac")}`, "2a")}` },
+
+/* Factor theorem */
+{ t: "factor", q: `Show that x − 3 is a factor of f(x) = x${s3} − 4x${s2} + x + 6 and factorise f(x) fully.`,
+  s: ["f(3) = 27 − 36 + 3 + 6 = 0", "Divide: x² − x − 2 = (x − 2)(x + 1)"], a: "(x − 3)(x − 2)(x + 1)" },
+{ t: "factor", q: `Given that 2x − 1 is a factor of 2x${s3} + kx${s2} − 13x + 6, find k and solve f(x) = 0.`,
+  s: ["f(½) = 0 ⇒ ¼ + k/4 − 13/2 + 6 = 0 ⇒ k = 1", "(2x − 1)(x² + x − 6) = (2x − 1)(x + 3)(x − 2)"], a: "k = 1; x = ½, −3, 2" },
+{ t: "factor", q: `Given that x${s2} − x − 2 is a factor of x${s3} + ax${s2} + bx − 6, find a and b.`,
+  s: ["x² − x − 2 = (x − 2)(x + 1): f(2) = 0 and f(−1) = 0", "2a + b = −1 and a − b = 7"], a: "a = 2, b = −5 (third factor x + 3)" },
+{ t: "factor", q: `x − 1 and x + 2 are factors of x${s3} + ax${s2} + bx − 6. Find a, b and the third factor.`,
+  s: ["f(1) = 0 ⇒ a + b = 5", "f(−2) = 0 ⇒ 2a − b = 7", "a = 4, b = 1; x³ + 4x² + x − 6 = (x² + x − 2)(x + 3)"], a: "a = 4, b = 1; (x + 3)" },
+{ t: "factor", q: `Show that x + 2 is a factor of 2x${s3} − 3x${s2} − 11x + 6 and solve 2x${s3} − 3x${s2} − 11x + 6 = 0.`,
+  s: ["f(−2) = −16 − 12 + 22 + 6 = 0", "(x + 2)(2x² − 7x + 3) = (x + 2)(2x − 1)(x − 3)"], a: "x = −2, ½, 3" },
+
+/* Non-linear */
+{ t: "nonlin", q: `Solve: y = x + 1 and x${s2} + y${s2} = 13.`,
+  s: [`x${s2} + (x + 1)${s2} = 13 ⇒ x${s2} + x − 6 = 0`, "x = 2 or −3"], a: "(2, 3) and (−3, −2)" },
+{ t: "nonlin", q: `Find where the line x + y = 6 meets the circle x${s2} + y${s2} − 4x + 2y − 20 = 0.`,
+  s: ["y = 6 − x; substitute", `2x${s2} − 18x + 28 = 0 ⇒ (x − 2)(x − 7) = 0`], a: "(2, 4) and (7, −1)" },
+{ t: "nonlin", q: `Find the points of intersection of x + 2y = 5 and x${s2} + y${s2} = 10.`,
+  s: ["x = 5 − 2y", `5y${s2} − 20y + 15 = 0 ⇒ y = 1 or 3`], a: "(3, 1) and (−1, 3)" },
+{ t: "nonlin", q: `Solve the simultaneous equations x − y = 2 and x${s2} + y${s2} = 10.`,
+  s: ["x = y + 2", `2y${s2} + 4y − 6 = 0 ⇒ y = 1 or −3`], a: "(3, 1) and (−1, −3)" },
+{ t: "nonlin", q: `Solve the simultaneous equations 2x + y = 5 and x${s2} + y${s2} = 10.`,
+  s: ["y = 5 − 2x", `5x${s2} − 20x + 15 = 0 ⇒ x = 1 or 3`], a: "(1, 3) and (3, −1)" },
+
+/* Creating equations from graphs */
+{ t: "graphs", q: `The graph of a quadratic function is shown. Find its equation in the form y = x${s2} + bx + c.`, g: "q1",
+  s: ["y = k(x + 2)(x − 4)", "(0, −8): −8k = −8 ⇒ k = 1"], a: `y = x${s2} − 2x − 8` },
+{ t: "graphs", q: `The cubic shown crosses the x-axis at −1 and touches it at 2. Find its equation.`, g: "c1",
+  s: ["Touching ⇒ repeated root: y = k(x + 1)(x − 2)²", "(0, 4): 4k = 4 ⇒ k = 1"], a: `y = x${s3} − 3x${s2} + 4` },
+{ t: "graphs", q: `Find the equation of the cubic shown, in the form y = x${s3} + px${s2} + qx + r.`, g: "c2",
+  s: ["y = k(x + 1)(x − 2)(x − 4)", "(0, 8): 8k = 8 ⇒ k = 1"], a: `y = x${s3} − 5x${s2} + 2x + 8` },
+{ t: "graphs", q: `A parabola has a maximum point at (−1, 8) and crosses the x-axis at x = 1. Find its equation and the other root.`,
+  s: ["y = a(x + 1)² + 8", "(1, 0): 4a + 8 = 0 ⇒ a = −2"], a: `y = −2x${s2} − 4x + 6; other root x = −3` },
+{ t: "graphs", q: `Find the equation of the quadratic shown.`, g: "q2",
+  s: ["y = k(x + 1)(x − 3)", "(0, −6): −3k = −6 ⇒ k = 2"], a: `y = 2x${s2} − 4x − 6` },
+
+/* Discriminant */
+{ t: "disc", q: `Find k if x${s2} − 6x + k = 0 has equal roots.`, s: ["b² − 4ac = 0: 36 − 4k = 0"], a: "k = 9" },
+{ t: "disc", q: `Find the range of values of k for which 2x${s2} + kx + 8 = 0 has no real roots.`,
+  s: ["k² − 64 < 0", "(k − 8)(k + 8) < 0"], a: "−8 < k < 8" },
+{ t: "disc", q: `Prove that x${s2} + (k − 2)x − k = 0 has real and distinct roots for all real k.`,
+  s: ["Δ = (k − 2)² + 4k = k² + 4", "k² ≥ 0 ⇒ Δ ≥ 4 > 0"], a: "Δ > 0 for all k" },
+{ t: "disc", q: `Find the values of k for which x${s2} + (k − 3)x + k = 0 has equal roots.`,
+  s: ["(k − 3)² − 4k = 0 ⇒ k² − 10k + 9 = 0", "(k − 1)(k − 9) = 0"], a: "k = 1 or k = 9" },
+{ t: "disc", q: `Show that 2x${s2} − 3x + 5 = 0 has no real roots.`, s: ["Δ = 9 − 40 = −31 < 0"], a: "No real roots" },
+{ t: "disc", q: `Find the values of k for which the line y = kx − 1 is a tangent to y = x${s2} + 3.`,
+  s: ["x² − kx + 4 = 0 must have equal roots", "k² − 16 = 0"], a: "k = ±4", also: ["nonlin"] },
+
+/* Substitution */
+{ t: "subst", q: `Solve x${s4} − 10x${s2} + 9 = 0.`, s: ["u = x²: u² − 10u + 9 = 0 ⇒ u = 1 or 9"], a: "x = ±1, ±3" },
+{ t: "subst", q: `Solve 2<sup>2x+1</sup> − 9(2<sup>x</sup>) + 4 = 0.`,
+  s: ["2^(2x+1) = 2(2^x)²; u = 2^x: 2u² − 9u + 4 = 0", "u = ½ or 4"], a: "x = −1 or x = 2" },
+{ t: "subst", q: `Solve (x + ${F("1", "x")})${s2} − 5(x + ${F("1", "x")}) + 6 = 0.`,
+  s: ["u = x + 1/x: u = 2 or 3", "x + 1/x = 2 ⇒ x = 1; x + 1/x = 3 ⇒ x² − 3x + 1 = 0"], a: `x = 1, x = ${F(`3 ± ${R("5")}`, "2")}` },
+{ t: "subst", q: `Solve 3<sup>2x</sup> − 4(3<sup>x</sup>) + 3 = 0.`, s: ["u = 3^x: (u − 1)(u − 3) = 0"], a: "x = 0 or x = 1" },
+{ t: "subst", q: `Solve (x${s2} − 2x)${s2} − 11(x${s2} − 2x) + 24 = 0.`,
+  s: ["u = x² − 2x: u = 3 or 8", "x² − 2x = 3 ⇒ x = 3, −1; x² − 2x = 8 ⇒ x = 4, −2"], a: "x = −2, −1, 3, 4" },
+
+/* Radians */
+{ t: "rad", q: `Convert 225° to radians and ${F("7π", "12")} radians to degrees.`, s: ["× π/180 and × 180/π"], a: "5π/4 rad; 105°" },
+{ t: "rad", q: `A sector of radius 6 cm has a perimeter of 30 cm. Find its angle in radians and its area.`,
+  s: ["12 + 6θ = 30 ⇒ θ = 3", "A = ½(36)(3)"], a: "θ = 3 rad; 54 cm²" },
+{ t: "rad", q: `A sector of radius r has a perimeter of 20 cm. Show that its area is 10r − r${s2} and find the maximum area.`,
+  s: ["θ = (20 − 2r)/r; A = ½r²θ = 10r − r²", "= 25 − (r − 5)²"], a: "25 cm² when r = 5, θ = 2", also: ["cts"] },
+{ t: "rad", q: `A sector of radius 10 cm has an arc length of 15 cm. Find the angle in radians and degrees, and the area.`,
+  s: ["15 = 10θ ⇒ θ = 1.5", "1.5 × 180/π ≈ 86°; A = ½(100)(1.5)"], a: "1.5 rad ≈ 86°; 75 cm²" },
+{ t: "rad", q: `A sector has angle ${F("5π", "6")} and area 15π cm${s2}. Find its radius.`,
+  s: ["½r²(5π/6) = 15π ⇒ r² = 36"], a: "r = 6 cm" },
+
+/* Right-angled */
+{ t: "right", q: `A ramp is 4.5 m long and rises 0.6 m vertically. Find the angle it makes with the ground to the nearest degree.`,
+  s: ["sin θ = 0.6/4.5"], a: "8°" },
+{ t: "right", q: `Given tan A = ${F("5", "12")} with A acute, find the exact values of sin A and cos A.`,
+  s: ["H = √(25 + 144) = 13"], a: "sin A = 5/13, cos A = 12/13" },
+{ t: "right", q: `The angle of elevation of the top of a tower is 30°. From a point 50 m closer it is 60°. Find the exact height.`,
+  s: ["d = h/√3 and d + 50 = h√3", "2h = 50√3"], a: `h = 25${R("3")} m` },
+{ t: "right", q: `From the top of an 80 m cliff, the angles of depression of two boats in line with its foot are 45° and 30°. Find the exact distance between the boats.`,
+  s: ["Near boat: 80/tan 45° = 80", "Far boat: 80/tan 30° = 80√3"], a: `80(${R("3")} − 1) m ≈ 58.6 m` },
+{ t: "right", q: `A 6 m ladder makes an angle of 70° with level ground. How high up the wall does it reach?`,
+  s: ["h = 6 sin 70°"], a: "5.64 m" },
+
+/* Solving trig equations */
+{ t: "solve", q: `Solve cos x = −½ for 0° ≤ x ≤ 360°.`, s: ["Ref angle 60°; cos negative in Q2, Q3"], a: "120°, 240°" },
+{ t: "solve", q: `Solve 2cos${s2}x + 3 sin x − 3 = 0 for 0° ≤ x ≤ 360°.`,
+  s: ["cos²x = 1 − sin²x ⇒ 2sin²x − 3 sin x + 1 = 0", "sin x = ½ or 1"], a: "30°, 90°, 150°", also: ["subst"] },
+{ t: "solve", q: `Find the general solution of tan 3x = −1, and list the solutions in 0 ≤ x ≤ π.`,
+  s: ["3x = 3π/4 + nπ ⇒ x = π/4 + nπ/3"], a: "π/4, 7π/12, 11π/12" },
+{ t: "solve", q: `Solve sin 2x = −${F(R("3"), "2")} for 0° ≤ x ≤ 360°.`,
+  s: ["Ref 60°; Q3, Q4: 2x = 240°, 300°, 600°, 660°", "÷ 2"], a: "120°, 150°, 300°, 330°" },
+{ t: "solve", q: `Solve 2 sin${s2}x − sin x − 1 = 0 for 0° ≤ x ≤ 360°.`,
+  s: ["(2 sin x + 1)(sin x − 1) = 0", "sin x = 1 or −½"], a: "90°, 210°, 330°", also: ["subst"] },
+
+/* Trig graphs */
+{ t: "tgraph", q: `Write down the period and range of y = 5 cos 4x.`, s: ["Period 2π/4; amplitude 5"], a: "π/2; [−5, 5]" },
+{ t: "tgraph", q: `Sketch f(x) = 3 sin(x/2) for 0 ≤ x ≤ 4π and state how many solutions f(x) = 2 has.`,
+  s: ["Period 4π, amplitude 3", "y = 2 cuts the single positive hump twice"], a: "2 solutions" },
+{ t: "tgraph", q: `The graph shows y = a + b cos(cx). Find a, b and c.`, g: "t1",
+  s: ["Max 3, min −1: a = 1, b = 2", "Period 2π/3 ⇒ c = 3"], a: "y = 1 + 2 cos 3x" },
+{ t: "tgraph", q: `The graph shows y = a + b sin(cx). Find a, b and c.`, g: "t2",
+  s: ["Max 4, min −2: a = 1, b = 3", "Period π ⇒ c = 2"], a: "y = 1 + 3 sin 2x" },
+{ t: "tgraph", q: `State the amplitude, period and range of y = 3 sin 2x.`, s: ["Amplitude 3; period 2π/2"], a: "3; π; [−3, 3]" },
+
+/* Proofs */
+{ t: "proof", q: `Prove the sine rule ${F("a", "sin A")} = ${F("b", "sin B")} for an acute-angled triangle.`,
+  s: ["Perpendicular h from C: h = b sin A and h = a sin B", "b sin A = a sin B"], a: "Proved" },
+{ t: "proof", q: `Prove the cosine rule a${s2} = b${s2} + c${s2} − 2bc cos A.`,
+  s: ["A(0, 0), B(c, 0), C(b cos A, b sin A)", "a² = (b cos A − c)² + (b sin A)²", "cos²A + sin²A = 1"], a: "Proved" },
+{ t: "proof", q: `Use the cosine rule to prove that a = b cos C + c cos B in any triangle.`,
+  s: ["cos C = (a² + b² − c²)/2ab; cos B = (a² + c² − b²)/2ac", "b cos C + c cos B = 2a²/2a"], a: "Proved" },
+{ t: "proof", q: `In triangle ABC, A is at (0, 0), B at (c, 0) and C at (b cos A, b sin A). Show that a${s2} = b${s2} + c${s2} − 2bc cos A.`,
+  s: ["Distance formula for |BC|", "Expand and use cos²A + sin²A = 1"], a: "Shown" },
+
+/* Rules */
+{ t: "rules", q: `A triangle has sides 7 cm, 8 cm and 13 cm. Find the largest angle and the exact area.`,
+  s: ["cos θ = (49 + 64 − 169)/112 = −½", "Area = ½(7)(8) sin 120°"], a: `120°; 14${R("3")} cm²` },
+{ t: "rules", q: `In triangle ABC, |AB| = 10 cm, |BC| = 7 cm and ∠BAC = 40°. Find the two possible values of ∠ACB.`,
+  s: ["sin C = 10 sin 40°/7 = 0.918…", "C or 180° − C"], a: "66.7° or 113.3°" },
+{ t: "rules", q: `In quadrilateral ABCD, |AB| = 5, |BC| = 8, |CD| = 6, ∠ABC = 60° and ∠ACD = 50°. Find |AC| and the area of ABCD.`,
+  s: ["|AC|² = 25 + 64 − 80 cos 60° = 49", "Areas: 10√3 + ½(7)(6) sin 50°"], a: "|AC| = 7; area ≈ 33.41" },
+{ t: "rules", q: `In triangle ABC, |AB| = 8 cm, |BC| = 6 cm and ∠ABC = 120°. Find |AC| and the area in surd form.`,
+  s: ["|AC|² = 64 + 36 − 96 cos 120° = 148", "Area = ½(8)(6) sin 120°"], a: `|AC| ≈ 12.17 cm; 12${R("3")} cm²` },
+{ t: "rules", q: `A triangle has sides 5 cm, 7 cm and 8 cm. Find the angle opposite the 7 cm side and the area.`,
+  s: ["cos θ = (25 + 64 − 49)/80 = ½", "Area = ½(5)(8) sin 60°"], a: `60°; 10${R("3")} cm²` },
+{ t: "rules", q: `In triangle PQR, |PQ| = 8 cm, |QR| = 11 cm and ∠PQR = 52°. Find |PR| and the area.`,
+  s: ["|PR|² = 64 + 121 − 176 cos 52°", "Area = ½(8)(11) sin 52°"], a: "|PR| ≈ 8.8 cm; 35 cm²" },
+
+/* 3D */
+{ t: "threeD", q: `A vertical pole 15 m high stands on level ground. Point A is 20 m from its foot. Find the distance from A to the top and the angle of elevation.`,
+  s: ["√(15² + 20²) = 25", "tan θ = 15/20"], a: "25 m; 36.9°", also: ["right"] },
+{ t: "threeD", q: `A right pyramid has a square base of side 8 cm and sloping edges of 9 cm. Find its height and the angle a sloping edge makes with the base.`,
+  s: ["Half-diagonal = 4√2", "h² = 81 − 32 = 49", "tan θ = 7/(4√2)"], a: "7 cm; 51.1°" },
+{ t: "threeD", q: `A mast stands on level ground. A is due south and B is due east of its foot, with |AB| = 100 m. The angles of elevation of the top from A and B are 40° and 30°. Find the height.`,
+  s: ["|QA| = h/tan 40°, |QB| = h√3", "|QA|² + |QB|² = 100²"], a: "≈ 47.6 m" },
+{ t: "threeD", q: `A cuboid measures 12 cm by 5 cm by 4 cm. Find the length of a space diagonal and the angle it makes with the base.`,
+  s: ["Base diagonal = 13", "Space diagonal = √(169 + 16)", "tan θ = 4/13"], a: "≈ 13.6 cm; 17.1°" },
+{ t: "threeD", q: `A vertical mast PQ stands on level ground. |QA| = 40 m, ∠AQB = 90°, and the angles of elevation of P from A and B are 32° and 25°. Find |PQ| and |AB|.`,
+  s: ["|PQ| = 40 tan 32°", "|QB| = |PQ|/tan 25°", "|AB| = √(40² + |QB|²)"], a: "|PQ| ≈ 25.0 m; |AB| ≈ 67 m" },
+];
+PROBLEMS.forEach((p, i) => (p.id = "p" + (i + 1)));
+
+
+// ================= state =================
+const CH_COL = { "Algebra I": "var(--a1)", "Algebra II": "var(--a2)", "Trigonometry": "var(--tr)" };
+const TYPE = Object.fromEntries(TYPES.map((t) => [t.id, t]));
+const PROB = Object.fromEntries(PROBLEMS.map((p) => [p.id, p]));
+const DECKS = {
+  alg: { id: "alg", name: "Algebra I & II", chapters: ["Algebra I", "Algebra II"] },
+  full: { id: "full", name: "Full revision", chapters: ["Algebra I", "Algebra II", "Trigonometry"] },
+};
+const STAGES = [
+  { n: 1, name: "Clue + 3 choices", short: "Clued", desc: "A clue tells you what to look for. Pick from three topics.", fade: 4 },
+  { n: 2, name: "4 choices", short: "Choices", desc: "No clue. The wrong answers are look-alike topics.", fade: 3 },
+  { n: 3, name: "All topics", short: "All topics", desc: "Pick the topic from the full list for this deck.", fade: 2 },
+  { n: 4, name: "Cold read", short: "Cold", desc: "Problem only. Say the topic and first step, then reveal.", fade: 1 },
+];
+const PER_STAGE = 8;
+
+const S = {
+  deck: "alg", stage: 1, cards: [], i: 0, results: [], answered: null, used: new Set(), stageScores: {},
+  practice: load(), libFilter: "all",
+};
+
+function load() { try { return JSON.parse(localStorage.getItem("ntq-practice") || "[]"); } catch (e) { return []; } }
+function save() { try { localStorage.setItem("ntq-practice", JSON.stringify(S.practice)); } catch (e) {} updateCount(); }
+function updateCount() { document.getElementById("pcount").textContent = S.practice.length; }
+function isStarred(id) { return S.practice.includes(id); }
+function toggleStar(id) {
+  if (isStarred(id)) S.practice = S.practice.filter((x) => x !== id);
+  else S.practice.push(id);
+  save();
+  toast(isStarred(id) ? "Added to the practice list" : "Removed from the practice list");
+}
+let toastT;
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 1600); }
+
+const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const deckTypes = () => TYPES.filter((t) => DECKS[S.deck].chapters.includes(t.ch));
+const deckProblems = () => PROBLEMS.filter((p) => DECKS[S.deck].chapters.includes(TYPE[p.t].ch));
+const accepted = (p) => [p.t, ...(p.also || [])];
+
+// ================= graphs =================
+function graphSVG(key) {
+  const g = G[key]; const W = 420, H = 260, pad = 30;
+  const [x0, x1] = g.x, [y0, y1] = g.y;
+  const X = (x) => pad + (x - x0) / (x1 - x0) * (W - 2 * pad);
+  const Y = (y) => H - pad - (y - y0) / (y1 - y0) * (H - 2 * pad);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Graph for this problem">`;
+  // grid
+  const xs = g.trig ? Array.from({ length: 7 }, (_, i) => i * Math.PI / 3) : rng(Math.ceil(x0), Math.floor(x1), 1);
+  const ystep = (y1 - y0) > 12 ? 2 : 1;
+  rng(Math.ceil(y0 / ystep) * ystep, Math.floor(y1), ystep).forEach((y) => { s += `<line x1="${pad}" x2="${W - pad}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--line)" stroke-width="1"/>`; if (y !== 0) s += `<text x="${X(Math.max(0, x0)) - 6}" y="${Y(y) + 4}" font-size="11" text-anchor="end" fill="var(--muted)">${String(y).replace("-", "−")}</text>`; });
+  xs.forEach((x, i) => { s += `<line y1="${pad / 2}" y2="${H - pad}" x1="${X(x)}" x2="${X(x)}" stroke="var(--line)" stroke-width="1"/>`; const lab = g.trig ? ["0", "π/3", "2π/3", "π", "4π/3", "5π/3", "2π"][i] : (x === 0 ? "" : String(x).replace("-", "−")); s += `<text x="${X(x)}" y="${Y(0) + 15}" font-size="11" text-anchor="middle" fill="var(--muted)">${lab}</text>`; });
+  // axes
+  s += `<line x1="${pad}" x2="${W - pad + 6}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--ink)" stroke-width="1.4"/>`;
+  s += `<line y1="${pad / 2}" y2="${H - pad}" x1="${X(Math.max(0, x0))}" x2="${X(Math.max(0, x0))}" stroke="var(--ink)" stroke-width="1.4"/>`;
+  s += `<text x="${W - pad + 10}" y="${Y(0) + 4}" font-size="13" font-style="italic" fill="var(--ink)">x</text>`;
+  s += `<text x="${X(Math.max(0, x0)) + 6}" y="${pad / 2 + 8}" font-size="13" font-style="italic" fill="var(--ink)">y</text>`;
+  // curve
+  const segs = []; let cur = []; const N = 300;
+  for (let k = 0; k <= N; k++) { const x = x0 + (x1 - x0) * k / N; const y = g.f(x); if (y < y0 || y > y1) { if (cur.length) segs.push(cur); cur = []; continue; } cur.push(`${X(x).toFixed(1)},${Y(y).toFixed(1)}`); }
+  if (cur.length) segs.push(cur);
+  const d = segs.map((c) => "M" + c.join(" L")).join(" ");
+  s += `<path d="${d}" fill="none" stroke="var(--a1)" stroke-width="2.4"/>`;
+  (g.pts || []).forEach(([x, y, lab]) => { s += `<circle cx="${X(x)}" cy="${Y(y)}" r="4" fill="var(--tr)"/><text x="${X(x) + 7}" y="${Y(y) - 7}" font-size="12" fill="var(--ink)">${lab}</text>`; });
+  return s + "</svg>";
+}
+function rng(a, b, st) { const o = []; for (let v = a; v <= b + 1e-9; v += st) o.push(Math.round(v * 100) / 100); return o; }
+
+// ================= helpers =================
+const typeChip = (id) => `<span class="typechip"><i style="background:${CH_COL[TYPE[id].ch]}"></i>${TYPE[id].name}</span>`;
+const solHTML = (p) => `<div class="solution">${p.s.map((l) => `<div>${l}</div>`).join("")}<div class="ans">${p.a}</div></div>`;
+const qBody = (p) => `<div class="qtext">${p.q}</div>${p.g ? `<div class="graph">${graphSVG(p.g)}</div>` : ""}`;
+const view = () => document.getElementById("view");
+function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else route(); }
+
+// ================= HOME =================
+function home() {
+  const dk = (id) => {
+    const d = DECKS[id]; const ts = TYPES.filter((t) => d.chapters.includes(t.ch)); const n = PROBLEMS.filter((p) => d.chapters.includes(TYPE[p.t].ch)).length;
+    const bar = d.chapters.map((c) => `<i style="flex:${TYPES.filter((t) => t.ch === c).length};background:${CH_COL[c]}"></i>`).join("");
+    return `<button class="deck" type="button" data-deck="${id}" aria-pressed="${S.deck === id}">
+      <span class="count">${ts.length}</span><strong>${d.name}</strong>
+      <span class="muted">${d.chapters.join(" · ")} — ${ts.length} question types, ${n} problems</span>
+      <span class="bar" aria-hidden="true">${bar}</span></button>`;
+  };
+  const st = STAGES.map((s) => `<button class="stagecard" type="button" data-stage="${s.n}" aria-pressed="${S.stage === s.n}">
+      <span class="n">Stage ${s.n}</span><strong>${s.name}</strong><span class="muted" style="font-size:14px">${s.desc}</span>
+      <span class="fade" aria-label="Scaffolding level ${s.fade} of 4">${[1, 2, 3, 4].map((k) => `<i class="${k <= s.fade ? "" : "off"}"></i>`).join("")}</span></button>`).join("");
+  view().innerHTML = `
+    <section class="hero">
+      <div>
+        <h1>Read the question. Name the topic. Know your first move.</h1>
+        <p class="lead">Each round shows a real exam-style problem. Early on you get a clue and three options; by stage 4 you only see the problem. Star any question to add it to the practice list, where the full solution is waiting.</p>
+      </div>
+      <div class="panel" style="display:flex;flex-direction:column;gap:12px">
+        <h3>How the help fades</h3>
+        <p class="muted" style="font-size:15px">${PER_STAGE} problems per stage. Aim for 6 out of ${PER_STAGE} before moving on. You can jump to any stage.</p>
+        <div class="row"><button class="btn primary big" id="start" type="button">Start stage ${S.stage}</button></div>
+      </div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px"><h2>Choose a deck</h2><div class="decks">${dk("alg")}${dk("full")}</div></section>
+    <section style="display:flex;flex-direction:column;gap:10px"><h2>Choose a stage</h2><div class="stages">${st}</div></section>`;
+  view().querySelectorAll("[data-deck]").forEach((b) => b.onclick = () => { S.deck = b.dataset.deck; S.used = new Set(); home(); });
+  view().querySelectorAll("[data-stage]").forEach((b) => b.onclick = () => { S.stage = +b.dataset.stage; home(); });
+  document.getElementById("start").onclick = () => startStage(S.stage);
+}
+
+// ================= PLAY =================
+function drawCards() {
+  // spread across types, avoid repeats within a run where possible
+  const types = shuffle(deckTypes().map((t) => t.id));
+  const pool = (id) => shuffle(deckProblems().filter((p) => p.t === id && !S.used.has(p.id)));
+  const cards = [];
+  for (const id of types) { if (cards.length >= PER_STAGE) break; let c = pool(id)[0]; if (!c) c = shuffle(deckProblems().filter((p) => p.t === id))[0]; cards.push(c.id); }
+  cards.forEach((id) => S.used.add(id));
+  if (S.used.size >= deckProblems().length - PER_STAGE) S.used = new Set(cards);
+  return cards;
+}
+function startStage(n) {
+  S.stage = n; S.cards = drawCards(); S.i = 0; S.results = []; S.answered = null;
+  go("play");
+}
+function options(p) {
+  const inDeck = new Set(deckTypes().map((t) => t.id));
+  const ok = accepted(p);
+  const conf = shuffle(TYPE[p.t].conf.filter((c) => inDeck.has(c) && !ok.includes(c)));
+  const others = shuffle(deckTypes().map((t) => t.id).filter((c) => !ok.includes(c) && !conf.includes(c)));
+  if (S.stage === 1) return shuffle([p.t, ...others.slice(0, 2)]);               // easy: far-apart distractors
+  return shuffle([p.t, ...conf.slice(0, 3), ...others].slice(0, 4));            // look-alikes
+}
+function play() {
+  if (!S.cards.length) return go("home");
+  const p = PROB[S.cards[S.i]]; const st = STAGES[S.stage - 1];
+  const steps = STAGES.map((s) => `<span class="${s.n === S.stage ? "on" : (S.stageScores[S.deck + s.n] != null ? "done" : "")}">${s.n}. ${s.short}</span>`).join("");
+  const right = S.results.filter((r) => r.ok).length;
+  let body = "";
+  if (S.stage === 1) body += `<div class="clue"><b>Look for:</b> ${TYPE[p.t].clue}</div>`;
+  if (S.stage <= 2) {
+    body += `<div class="opts" role="group" aria-label="Choose the topic">${options(p).map((id, k) => `<button class="opt" type="button" data-pick="${id}"><span class="k">${k + 1}</span><span class="sw" style="background:${CH_COL[TYPE[id].ch]}"></span>${TYPE[id].name}</button>`).join("")}</div>`;
+  } else if (S.stage === 3) {
+    body += `<div class="allgrid">${DECKS[S.deck].chapters.map((c) => `<div class="col"><h3 style="color:${CH_COL[c]}">${c}</h3>${TYPES.filter((t) => t.ch === c).map((t) => `<button class="opt" type="button" data-pick="${t.id}"><span class="sw" style="background:${CH_COL[c]}"></span>${t.name}</button>`).join("")}</div>`).join("")}</div>`;
+  } else {
+    body += `<div class="clue" style="border-style:solid"><b>Say it out loud:</b> which topic is this, and what is your first step? Then reveal.</div>
+      <div class="timer" aria-hidden="true"><i id="tbar"></i></div>
+      <div class="row"><button class="btn primary big" id="reveal" type="button">Reveal</button></div>`;
+  }
+  view().innerHTML = `
+    <div class="playbar"><div class="steps" aria-label="Stages">${steps}</div><div class="score">${DECKS[S.deck].name} · Card ${S.i + 1} of ${S.cards.length} · ${right} correct</div></div>
+    <div class="progress" aria-hidden="true"><i style="width:${S.i / S.cards.length * 100}%"></i></div>
+    <article class="qcard">
+      <div class="label"><span>Stage ${S.stage} · ${st.name}</span><button class="btn starbtn" type="button" id="star" aria-pressed="${isStarred(p.id)}">${isStarred(p.id) ? "★ In practice list" : "☆ Practise later"}</button></div>
+      ${qBody(p)}
+      ${body}
+      <div id="fb"></div>
+    </article>`;
+  document.getElementById("star").onclick = (e) => { toggleStar(p.id); e.currentTarget.setAttribute("aria-pressed", isStarred(p.id)); e.currentTarget.textContent = isStarred(p.id) ? "★ In practice list" : "☆ Practise later"; };
+  view().querySelectorAll("[data-pick]").forEach((b) => b.onclick = () => pick(b.dataset.pick));
+  const rv = document.getElementById("reveal");
+  if (rv) {
+    rv.onclick = revealCold;
+    const bar = document.getElementById("tbar"); let t0 = performance.now();
+    const tick = (now) => { if (!document.getElementById("tbar") || S.answered) return; const f = Math.max(0, 1 - (now - t0) / 15000); bar.style.width = f * 100 + "%"; if (f > 0) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }
+}
+function feedbackBlock(p, ok, picked) {
+  const t = TYPE[p.t];
+  const also = (p.also || []).length ? `<p class="muted" style="font-size:14px">Also accepted: ${p.also.map((a) => TYPE[a].name).join(", ")}.</p>` : "";
+  return `<div class="feedback ${ok ? "good" : "bad"}">
+      <div class="verdict">${ok ? "Correct" : "Not quite"}</div>
+      <p>This is ${typeChip(p.t)}.${!ok && picked ? ` You chose ${TYPE[picked].name}.` : ""}</p>
+      ${also}
+      <p><b>The giveaway:</b> ${t.clue}</p>
+      <p><b>First move:</b> ${t.first}</p>
+      <div class="row">
+        <button class="btn" type="button" id="showsol" aria-expanded="false">Show the full solution</button>
+        <button class="btn primary" type="button" id="next">${S.i + 1 < S.cards.length ? "Next problem →" : "See stage results →"}</button>
+      </div>
+      <div id="sol" hidden>${solHTML(p)}</div>
+    </div>`;
+}
+function wireFeedback() {
+  document.getElementById("showsol").onclick = (e) => { const s = document.getElementById("sol"); s.hidden = !s.hidden; e.currentTarget.setAttribute("aria-expanded", !s.hidden); e.currentTarget.textContent = s.hidden ? "Show the full solution" : "Hide the solution"; };
+  document.getElementById("next").onclick = next;
+  document.getElementById("next").focus();
+}
+function pick(id) {
+  if (S.answered) return;
+  const p = PROB[S.cards[S.i]]; const ok = accepted(p).includes(id);
+  S.answered = { id, ok }; S.results.push({ id: p.id, ok, picked: id });
+  view().querySelectorAll("[data-pick]").forEach((b) => { b.disabled = true; if (accepted(p).includes(b.dataset.pick)) b.classList.add("right"); else if (b.dataset.pick === id) b.classList.add("wrong"); });
+  document.getElementById("fb").innerHTML = feedbackBlock(p, ok, id);
+  wireFeedback();
+}
+function revealCold() {
+  const p = PROB[S.cards[S.i]]; S.answered = { cold: true };
+  const t = TYPE[p.t];
+  document.getElementById("reveal").parentElement.remove();
+  document.getElementById("fb").innerHTML = `<div class="feedback" style="background:var(--paper);border:1px solid var(--line)">
+      <p style="font-size:19px">It’s ${typeChip(p.t)}${(p.also || []).length ? ` <span class="muted">(also fine: ${p.also.map((a) => TYPE[a].name).join(", ")})</span>` : ""}</p>
+      <p><b>First move:</b> ${t.first}</p>
+      <p><b>Did you get it?</b></p>
+      <div class="row"><button class="btn" type="button" id="gotit" style="border-color:var(--good);color:var(--good)">✓ I got it</button><button class="btn" type="button" id="missed" style="border-color:var(--bad);color:var(--bad)">✗ I missed it</button></div>
+    </div>`;
+  const mark = (ok) => {
+    S.results.push({ id: p.id, ok, picked: null }); S.answered = { ok };
+    document.getElementById("fb").innerHTML = feedbackBlock(p, ok, null).replace(ok ? "Correct" : "Not quite", ok ? "Nice — you named it" : "Marked as missed");
+    wireFeedback();
+  };
+  document.getElementById("gotit").onclick = () => mark(true);
+  document.getElementById("missed").onclick = () => mark(false);
+}
+function next() {
+  S.answered = null;
+  if (S.i + 1 < S.cards.length) { S.i++; play(); window.scrollTo({ top: 0 }); }
+  else { S.stageScores[S.deck + S.stage] = S.results.filter((r) => r.ok).length; go("results"); }
+}
+
+// ================= RESULTS =================
+function results() {
+  if (!S.results.length) return go("home");
+  const right = S.results.filter((r) => r.ok).length; const n = S.results.length;
+  const missed = S.results.filter((r) => !r.ok);
+  const nextStage = S.stage < 4 ? S.stage + 1 : null;
+  const msg = right >= 6 ? (nextStage ? `Ready for stage ${nextStage}.` : "You can recognise these cold. Well done.") : "Replay this stage before moving on, or star the ones you missed.";
+  view().innerHTML = `
+    <section style="display:flex;flex-direction:column;gap:6px"><span class="muted">${DECKS[S.deck].name} · Stage ${S.stage}: ${STAGES[S.stage - 1].name}</span><h1>${right} out of ${n}</h1><p class="lead" style="font-size:18px">${msg}</p></section>
+    <div class="row">
+      ${nextStage ? `<button class="btn primary big" id="nextstage" type="button">Start stage ${nextStage} →</button>` : ""}
+      <button class="btn big" id="replay" type="button">Replay stage ${S.stage}</button>
+      ${missed.length ? `<button class="btn big" id="starmissed" type="button">☆ Add the ${missed.length} missed to the practice list</button>` : ""}
+    </div>
+    <section class="list">${S.results.map((r) => itemHTML(PROB[r.id], r)).join("")}</section>`;
+  if (nextStage) document.getElementById("nextstage").onclick = () => startStage(nextStage);
+  document.getElementById("replay").onclick = () => startStage(S.stage);
+  const sm = document.getElementById("starmissed");
+  if (sm) sm.onclick = () => { missed.forEach((r) => { if (!isStarred(r.id)) S.practice.push(r.id); }); save(); toast(`${missed.length} added to the practice list`); results(); };
+  wireItems();
+}
+function itemHTML(p, r) {
+  const t = TYPE[p.t];
+  return `<article class="item" style="border-left-color:${CH_COL[t.ch]}">
+      <div class="meta">${typeChip(p.t)}<span class="row" style="gap:8px">${r ? `<span class="mark ${r.ok ? "ok" : "no"}">${r.ok ? "✓ Correct" : "✗ Missed"}</span>` : ""}
+        <button class="btn starbtn" type="button" data-star="${p.id}" aria-pressed="${isStarred(p.id)}" style="padding:5px 10px;font-size:14px">${isStarred(p.id) ? "★ Saved" : "☆ Practise"}</button>
+        <button class="btn" type="button" data-sol="${p.id}" aria-expanded="false" style="padding:5px 10px;font-size:14px">Solution</button></span></div>
+      <div class="qt">${p.q}</div>${p.g ? `<div class="graph" style="max-width:320px">${graphSVG(p.g)}</div>` : ""}
+      <div data-solbox="${p.id}" hidden>${solHTML(p)}</div>
+    </article>`;
+}
+function wireItems(onChange) {
+  view().querySelectorAll("[data-star]").forEach((b) => b.onclick = () => { toggleStar(b.dataset.star); b.setAttribute("aria-pressed", isStarred(b.dataset.star)); b.textContent = isStarred(b.dataset.star) ? "★ Saved" : "☆ Practise"; if (onChange) onChange(); });
+  view().querySelectorAll("[data-sol]").forEach((b) => b.onclick = () => { const box = b.closest(".item").querySelector("[data-solbox]"); box.hidden = !box.hidden; b.setAttribute("aria-expanded", !box.hidden); b.textContent = box.hidden ? "Solution" : "Hide"; });
+}
+
+// ================= LIBRARY =================
+function library() {
+  const f = S.libFilter;
+  const chips = [`<button class="chip" type="button" data-f="all" aria-pressed="${f === "all"}">All ${PROBLEMS.length}</button>`]
+    .concat(TYPES.map((t) => `<button class="chip" type="button" data-f="${t.id}" aria-pressed="${f === t.id}"><span style="color:${CH_COL[t.ch]}">●</span> ${t.name}</button>`)).join("");
+  const list = PROBLEMS.filter((p) => f === "all" || p.t === f);
+  view().innerHTML = `
+    <section style="display:flex;flex-direction:column;gap:6px"><h1>Problem library</h1><p class="muted">Every problem in the game, grouped by type. Star the ones the class wants to practise.</p></section>
+    <div class="filters" role="group" aria-label="Filter by question type">${chips}</div>
+    <section class="list">${list.map((p) => itemHTML(p)).join("")}</section>`;
+  view().querySelectorAll("[data-f]").forEach((b) => b.onclick = () => { S.libFilter = b.dataset.f; library(); });
+  wireItems();
+}
+
+// ================= PRACTICE =================
+function practice() {
+  const list = S.practice.map((id) => PROB[id]).filter(Boolean);
+  view().innerHTML = `
+    <section style="display:flex;flex-direction:column;gap:6px"><h1>Practice list</h1>
+      <p class="muted">${list.length ? `${list.length} problem${list.length === 1 ? "" : "s"} saved on this device. Work them in your copy, then open each solution to check.` : "Nothing saved yet. Star a problem during the game or in the problem library and it appears here."}</p></section>
+    ${list.length ? `<div class="row">
+      <button class="btn" type="button" id="allsol">Show all solutions</button>
+      <button class="btn" type="button" id="copy">Copy the list as text</button>
+      <button class="btn" type="button" id="clear">Clear the list</button></div>` : `<div class="row"><button class="btn primary" type="button" id="tolib">Open the problem library</button></div>`}
+    <section class="list">${list.map((p) => itemHTML(p)).join("")}</section>
+    <div id="confirm"></div>`;
+  wireItems(() => practice());
+  const tl = document.getElementById("tolib"); if (tl) tl.onclick = () => go("library");
+  if (!list.length) return;
+  document.getElementById("allsol").onclick = (e) => { const boxes = view().querySelectorAll("[data-solbox]"); const show = [...boxes].some((b) => b.hidden); boxes.forEach((b) => b.hidden = !show); view().querySelectorAll("[data-sol]").forEach((b) => { b.textContent = show ? "Hide" : "Solution"; b.setAttribute("aria-expanded", show); }); e.currentTarget.textContent = show ? "Hide all solutions" : "Show all solutions"; };
+  document.getElementById("copy").onclick = async () => {
+    const txt = list.map((p, i) => { const d = document.createElement("div"); d.innerHTML = p.q; const a = document.createElement("div"); a.innerHTML = p.a; return `${i + 1}. [${TYPE[p.t].name}] ${d.textContent.replace(/\s+/g, " ")}\n   Answer: ${a.textContent}`; }).join("\n\n");
+    try { await navigator.clipboard.writeText(txt); toast("Copied to the clipboard"); } catch (e) { toast("Copy was blocked by the browser"); }
+  };
+  document.getElementById("clear").onclick = () => {
+    document.getElementById("confirm").innerHTML = `<div class="panel row" style="justify-content:space-between"><span>Remove all ${list.length} problems from the practice list?</span><span class="row"><button class="btn" type="button" id="no">Keep them</button><button class="btn primary" type="button" id="yes">Clear the list</button></span></div>`;
+    document.getElementById("no").onclick = () => document.getElementById("confirm").innerHTML = "";
+    document.getElementById("yes").onclick = () => { S.practice = []; save(); practice(); };
+  };
+}
+
+// ================= routing & keys =================
+function route() {
+  const h = location.hash.replace("#", "") || "home";
+  ({ home, play, results, library, practice }[h] || home)();
+}
+window.addEventListener("hashchange", route);
+document.getElementById("nav-home").onclick = () => go("home");
+document.getElementById("nav-library").onclick = () => go("library");
+document.getElementById("nav-practice").onclick = () => go("practice");
+document.addEventListener("keydown", (e) => {
+  if ((location.hash || "") !== "#play" || e.target.closest("input,textarea")) return;
+  if (!S.answered && S.stage <= 2 && /^[1-4]$/.test(e.key)) { const b = view().querySelectorAll("[data-pick]")[+e.key - 1]; if (b) b.click(); }
+});
+updateCount();
+route();
+</script>
+</body>
+</html>
