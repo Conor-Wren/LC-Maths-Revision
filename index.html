@@ -169,6 +169,7 @@ p { margin: 0; }
 .fr > span:first-child { border-bottom: 1px solid currentColor; padding: 0 3px 1px; }
 .fr > span:last-child { padding: 1px 3px 0; }
 .sq { white-space: nowrap; }
+.ov { text-decoration: overline; text-decoration-thickness: 1px; }
 .sq > span { border-top: 1px solid currentColor; padding-top: 1px; margin-left: 1px; }
 sup, sub { line-height: 0; font-size: 0.7em; }
 
@@ -279,6 +280,16 @@ h1::after { content: ""; display: block; width: 84px; height: 4px; margin-top: 1
 .wrap { position: relative; z-index: 1; }
 @media (max-width: 1100px) { .deco { display: none; } }
 @media print { .deco { display: none; } }
+
+/* sub-groups inside a strand, sigma notation */
+.topicwrap[hidden] { display: none; }
+.topicwrap { display: flex; flex-direction: column; gap: 8px; }
+.grp, .grplabel { font-family: var(--mono); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--sc, var(--muted)); margin: 8px 0 0; }
+.grplabel { flex-basis: 100%; margin: 6px 0 0; color: var(--muted); }
+.grpband { font-family: var(--script); font-size: 30px; color: var(--sc); margin: 10px 0 -6px; transform: rotate(-1deg); }
+.sig { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; line-height: 1.05; margin: 0 4px; }
+.sig .sg-t, .sig .sg-b { font-size: .62em; font-family: var(--math); white-space: nowrap; }
+.sig .sg-s { font-size: 1.55em; line-height: .95; }
 </style>
 </head>
 <body>
@@ -300,7 +311,11 @@ h1::after { content: ""; display: block; width: 84px; height: 4px; margin-top: 1
 // ---------- maths helpers ----------
 const F = (n, d) => `<span class="fr"><span>${n}</span><span>${d}</span></span>`;
 const R = (x) => `<span class="sq">√<span>${x}</span></span>`;
+const CJ = (x) => `<span class="ov">${x}</span>`;
+const SQ = (n) => R(n);
 const s2 = "²", s3 = "³", s4 = "⁴";
+const TT = (k) => `T<sub>${k}</sub>`;
+const SG = (lo, hi, body) => `<span class="sig"><span class="sg-t">${hi}</span><span class="sg-s">∑</span><span class="sg-b">${lo}</span></span> ${body}`;
 
 // ---------- strands (top level of the library and the deck builder) ----------
 // To add a new strand, add a line here and give its topics  ch: "<strand id>"  below.
@@ -309,6 +324,8 @@ const STRANDS = [
   { id: "Algebra I", color: "var(--a1)" },
   { id: "Algebra II", color: "var(--a2)" },
   { id: "Trigonometry I", color: "var(--tr)" },
+  { id: "Complex Numbers", color: "var(--c5)" },
+  { id: "Sequences & Series", color: "var(--c4)" },
 ];
 
 // ---------- question types ----------
@@ -320,7 +337,7 @@ const TYPES = [
   { id: "ident", ch: "Algebra I", name: "Algebraic Identities",
     clue: "The ≡ sign or “for all values of x”: two forms of the same expression, with unknown letters to match.",
     first: "Expand one side fully, then equate coefficients of matching powers.",
-    conf: ["factor", "frac", "cts", "cubes"] },
+    conf: ["factor", "frac", "cts", "cubes", "divide"] },
   { id: "frac", ch: "Algebra I", name: "Algebraic Fractions",
     clue: "x in a denominator: “single fraction”, “simplify”, an equation with fractions, or A/(x − 1) + B/(x + 2).",
     first: "Factorise everything, find the LCD, then combine or multiply through.",
@@ -332,7 +349,11 @@ const TYPES = [
   { id: "cubes", ch: "Algebra I", name: "Factorisation & Cubes",
     clue: "A cube term (8a³, 27x³, x⁶) plus or minus a number, or “factorise fully”.",
     first: "Take out the HCF, then write each term as a cube: a³ ± b³ = (a ± b)(a² ∓ ab + b²).",
-    conf: ["factor", "ident", "binom"] },
+    conf: ["factor", "ident", "binom", "divide"] },
+  { id: "divide", ch: "Algebra I", name: "Algebraic Division",
+    clue: "“Divide … by …”, “find the quotient and remainder”, or a cubic or quartic divided by a linear or quadratic expression.",
+    first: "Write the dividend in descending powers (insert 0x² for a missing term), divide the leading terms, multiply back, subtract, and repeat.",
+    conf: ["factor", "cubes", "ident"] },
   { id: "surd", ch: "Algebra II", name: "Surd Equations",
     clue: "The unknown is inside a square root sign.",
     first: "Isolate a surd, square both sides, and check every answer at the end.",
@@ -344,7 +365,7 @@ const TYPES = [
   { id: "factor", ch: "Algebra II", name: "Factor Theorem",
     clue: "A cubic with “is a factor”, “show that (x − k) is a factor”, or unknown coefficients in a cubic.",
     first: "Substitute the root into f(x) and set f(k) = 0.",
-    conf: ["cubes", "ident", "graphs"] },
+    conf: ["cubes", "ident", "graphs", "divide"] },
   { id: "nonlin", ch: "Algebra II", name: "Non-linear Simultaneous Equations",
     clue: "One linear equation and one with squares (a line and a curve or circle): “points of intersection”.",
     first: "Make x or y the subject of the linear equation and substitute into the other.",
@@ -389,6 +410,111 @@ const TYPES = [
     clue: "A solid or several planes: a pyramid, cuboid, or a mast with points on the ground in different directions.",
     first: "Pull out each right-angled triangle and redraw it flat; find the shared side first.",
     conf: ["right", "rules"] },
+  /* ---------- Complex Numbers ---------- */
+  { id: "cxtrans", ch: "Complex Numbers", grp: "Rectangular form", name: "Transformations of Complex Numbers",
+    clue: "Adding, subtracting or multiplying complex numbers, with words like “plot”, “Argand diagram”, “describe what has happened geometrically” or powers of i.",
+    first: "Ask what each operation does: adding is a translation, multiplying by a real number scales the modulus, and multiplying by i rotates 90° anticlockwise.",
+    conf: ["cxdiv", "polarmd", "cxeq"] },
+  { id: "cxdiv", ch: "Complex Numbers", grp: "Rectangular form", name: "Dividing Complex Numbers",
+    clue: "A complex fraction with i in the denominator, to be written in the form a + bi.",
+    first: "Multiply the top and bottom by the conjugate of the denominator.",
+    conf: ["cxtrans", "cxmod", "polarmd"] },
+  { id: "cxeq", ch: "Complex Numbers", grp: "Rectangular form", name: "Equality of Complex Numbers",
+    clue: "Unknown real letters inside a complex equation, or the square root of a complex number written as a + bi.",
+    first: "Let z = a + bi, then equate the real parts and equate the imaginary parts.",
+    conf: ["cxroots", "cxmod", "nthroots"] },
+  { id: "cxmod", ch: "Complex Numbers", grp: "Rectangular form", name: "Modulus and Conjugate",
+    clue: "Modulus bars |z|, a conjugate z̄, or a product z·z̄, often with an unknown real number k.",
+    first: "Use |a + bi| = √(a² + b²) and z̄ = a − bi.",
+    conf: ["cxeq", "cxdiv", "topolar"] },
+  { id: "cxroots", ch: "Complex Numbers", grp: "Rectangular form", name: "Complex Roots of Equations",
+    clue: "A quadratic with no real roots, or a polynomial where one complex root is given and the others are asked for.",
+    first: "Check whether the coefficients are real. If they are, the conjugate is also a root, so build a quadratic factor from the pair.",
+    conf: ["cxeq", "nthroots", "cxmod"] },
+  { id: "topolar", ch: "Complex Numbers", grp: "Polar form and De Moivre", name: "Converting to Polar Form",
+    clue: "A number in the form a + bi is to be written as r(cos θ + i sin θ).",
+    first: "Find r = √(a² + b²), then the reference angle from tan⁻¹(b/a), and use the quadrant to fix θ.",
+    conf: ["torect", "cxmod", "demoivre"] },
+  { id: "torect", ch: "Complex Numbers", grp: "Polar form and De Moivre", name: "Converting to Rectangular Form",
+    clue: "A number given as r(cos θ + i sin θ) is to be written as a + bi.",
+    first: "Evaluate cos θ and sin θ exactly, then multiply both by r.",
+    conf: ["topolar", "demoivre", "conjid"] },
+  { id: "polarmd", ch: "Complex Numbers", grp: "Polar form and De Moivre", name: "Multiplying and Dividing in Polar Form",
+    clue: "Two numbers given by modulus and argument (or in polar form), to be multiplied or divided.",
+    first: "Multiply the moduli and add the arguments, or divide the moduli and subtract the arguments.",
+    conf: ["cxtrans", "demoivre", "cxdiv"] },
+  { id: "demoivre", ch: "Complex Numbers", grp: "Polar form and De Moivre", name: "De Moivre’s Theorem: Powers",
+    clue: "A complex number raised to a whole-number power, often a large one such as (3 + 3√3 i)¹⁰.",
+    first: "Write it in polar form, then raise the modulus to the power and multiply the argument by the power.",
+    conf: ["conjid", "nthroots", "polarmd"] },
+  { id: "nthroots", ch: "Complex Numbers", grp: "Polar form and De Moivre", name: "Roots of Complex Numbers",
+    clue: "“Find all solutions” to zⁿ = w, “the cube roots of”, or “the fourth roots of”.",
+    first: "Write w in polar form, take the nth root of the modulus and divide the argument by n, then add 360°/n repeatedly.",
+    conf: ["demoivre", "cxroots", "cxeq"] },
+  { id: "conjid", ch: "Complex Numbers", grp: "Polar form and De Moivre", name: "Simplifying (cos θ − i sin θ)ⁿ",
+    clue: "A minus sign between cos and i sin, raised to a power.",
+    first: "Rewrite cos θ − i sin θ as cos(−θ) + i sin(−θ), then apply De Moivre’s theorem.",
+    conf: ["demoivre", "torect", "trigid"] },
+  { id: "trigid", ch: "Complex Numbers", grp: "Polar form and De Moivre", name: "Proving Trig Identities with De Moivre",
+    clue: "“Express cos 4θ in terms of cos θ” or “show that cos 3θ = …”, using complex numbers.",
+    first: "Expand (cos θ + i sin θ)ⁿ with the binomial theorem, equate real (or imaginary) parts with cos nθ (or sin nθ), then replace sin²θ by 1 − cos²θ.",
+    conf: ["demoivre", "conjid", "nthroots"] },
+  { id: "cxconstr", ch: "Complex Numbers", grp: "Constructions", name: "Constructing Line Segments √n",
+    clue: "“Construct a line segment of length √15” or similar, with a ruler and compass.",
+    first: "Write n as a sum of two squares (or a square plus an earlier length squared) and build a right-angled triangle with Pythagoras.",
+    conf: ["cxmod", "cxeq"] },
+  { id: "genterm", ch: "Sequences & Series", grp: "Arithmetic & geometric sequences", name: "Writing the General Term",
+    clue: "A list of terms such as 3, 7, 11, … and the instruction “find the general term”.",
+    first: "Look for a common difference (arithmetic) or a common ratio (geometric), then use T<sub>n</sub> = a + (n − 1)d or T<sub>n</sub> = ar<sup>n−1</sup>.",
+    conf: ["tnvals", "prove", "quadcub"] },
+  { id: "nterms", ch: "Sequences & Series", grp: "Arithmetic & geometric sequences", name: "How Many Terms?",
+    clue: "“How many terms are in the sequence?” with the last term given.",
+    first: "Identify the type of sequence, write T<sub>n</sub>, set it equal to the last term and solve for n.",
+    conf: ["genterm", "finite", "tnvals"] },
+  { id: "tnvals", ch: "Sequences & Series", grp: "Arithmetic & geometric sequences", name: "General Term from Given Terms",
+    clue: "Two terms given by position, such as T<sub>3</sub> = 52 and T<sub>10</sub> = 213, and you must find T<sub>n</sub>.",
+    first: "Write each term using the formula, then subtract (arithmetic) or divide (geometric) to eliminate a.",
+    conf: ["genterm", "consec", "tnsn"] },
+  { id: "consec", ch: "Sequences & Series", grp: "Arithmetic & geometric sequences", name: "Consecutive Terms (Find x)",
+    clue: "Expressions in x given as consecutive terms of a sequence, and you must find x.",
+    first: "Arithmetic: T<sub>2</sub> − T<sub>1</sub> = T<sub>3</sub> − T<sub>2</sub>. Geometric: T<sub>2</sub> ÷ T<sub>1</sub> = T<sub>3</sub> ÷ T<sub>2</sub>.",
+    conf: ["prove", "tnvals", "prodsum"] },
+  { id: "prove", ch: "Sequences & Series", grp: "Arithmetic & geometric sequences", name: "Proving a Sequence is Arithmetic or Geometric",
+    clue: "“Prove that the sequence is arithmetic, geometric or linear”, with T<sub>n</sub> given as a formula.",
+    first: "Find T<sub>n+1</sub>, then show T<sub>n+1</sub> − T<sub>n</sub> is constant (arithmetic) or T<sub>n+1</sub> ÷ T<sub>n</sub> is constant (geometric).",
+    conf: ["consec", "genterm", "tnsn"] },
+  { id: "prodsum", ch: "Sequences & Series", grp: "Arithmetic & geometric sequences", name: "Product and Sum of Three Terms",
+    clue: "The product and the sum of three consecutive terms are given.",
+    first: "Write the terms as a/r, a, ar (geometric) or a − d, a, a + d (arithmetic). The product gives a first.",
+    conf: ["consec", "tnvals", "finite"] },
+  { id: "finite", ch: "Sequences & Series", grp: "Arithmetic & geometric series", name: "Sum of a Finite Series",
+    clue: "“Find the sum of the series” with a last term given, or S<sub>n</sub> for a stated n.",
+    first: "Find a, d or r and the number of terms n, then use S<sub>n</sub> = (n/2)[2a + (n − 1)d] or S<sub>n</sub> = a(1 − r<sup>n</sup>)/(1 − r).",
+    conf: ["sinf", "sigma", "nterms"] },
+  { id: "sinf", ch: "Sequences & Series", grp: "Arithmetic & geometric series", name: "Sum to Infinity",
+    clue: "A geometric series that goes on forever, “sum to infinity”, or the values of x for which a series converges.",
+    first: "Check |r| < 1, then use S<sub>∞</sub> = a/(1 − r).",
+    conf: ["finite", "recdec", "sigma"] },
+  { id: "recdec", ch: "Sequences & Series", grp: "Arithmetic & geometric series", name: "Recurring Decimals as Fractions",
+    clue: "A decimal with dots over the repeating digits, to be written as a fraction.",
+    first: "Split off any non-repeating part, write the repeating part as a geometric series, then use S<sub>∞</sub> = a/(1 − r).",
+    conf: ["sinf", "finite", "sigma"] },
+  { id: "sigma", ch: "Sequences & Series", grp: "Arithmetic & geometric series", name: "Sigma Notation",
+    clue: "The symbol ∑ with limits above and below it.",
+    first: "Substitute each value from the lower limit to the upper limit into the formula, then add the terms.",
+    conf: ["finite", "sinf", "recur"] },
+  { id: "tnsn", ch: "Sequences & Series", grp: "Arithmetic & geometric series", name: "General Term from the Sum Formula",
+    clue: "A formula for S<sub>n</sub>, or values of both T<sub>n</sub> and S<sub>n</sub>, and you must find T<sub>n</sub> or another sum.",
+    first: "Use T<sub>n</sub> = S<sub>n</sub> − S<sub>n−1</sub>, or substitute into the S<sub>n</sub> formula to find a and d.",
+    conf: ["tnvals", "finite", "genterm"] },
+  { id: "quadcub", ch: "Sequences & Series", grp: "Quadratic, cubic & recurrence", name: "Quadratic & Cubic Sequences",
+    clue: "A sequence whose second or third differences are constant, or a quadratic or cubic T<sub>n</sub> to be found.",
+    first: "Take differences until they are constant: the second difference is 2a (quadratic) and the third is 6a (cubic).",
+    conf: ["genterm", "recur", "tnvals"] },
+  { id: "recur", ch: "Sequences & Series", grp: "Quadratic, cubic & recurrence", name: "Recurrence Relations",
+    clue: "T<sub>n</sub> defined using earlier terms, such as T<sub>n</sub> = T<sub>n−1</sub> + T<sub>n−2</sub> (Fibonacci).",
+    first: "Substitute the starting terms into the relation one step at a time.",
+    conf: ["quadcub", "genterm", "sigma"] },
 ];
 
 // ---------- graph specs (drawn as inline SVG by the page) ----------
@@ -626,7 +752,998 @@ const PROBLEMS = [
   s: ["Base diagonal = 13", "Space diagonal = √(169 + 16)", "tan θ = 4/13"], a: "≈ 13.6 cm; 17.1°" },
 { t: "threeD", q: `A vertical mast PQ stands on level ground. |QA| = 40 m, ∠AQB = 90°, and the angles of elevation of P from A and B are 32° and 25°. Find |PQ| and |AB|.`,
   s: ["|PQ| = 40 tan 32°", "|QB| = |PQ|/tan 25°", "|AB| = √(40² + |QB|²)"], a: "|PQ| ≈ 25.0 m; |AB| ≈ 67 m" },
+
+/* ===== Sequences & Series ===== */
+/* Writing the general term */
+{ t: "genterm", q: `Find the general term ${TT("n")} of the sequence 3, 7, 11, …`,
+  s: ["Common difference d = 7 − 3 = 4, so the sequence is arithmetic", `${TT("n")} = a + (n − 1)d = 3 + 4(n − 1)`], a: `${TT("n")} = 4n − 1` },
+{ t: "genterm", q: `Find the general term of the sequence 100, −50, 25, …`,
+  s: ["Common ratio r = −50 ÷ 100 = −½ and 25 ÷ (−50) = −½, so it is geometric", `${TT("n")} = ar<sup>n−1</sup> with a = 100`], a: `${TT("n")} = 100(−${F("1", "2")})<sup>n−1</sup>` },
+{ t: "genterm", q: `Find the general term of the sequence 560, 224, 89.6, …`,
+  s: ["224 ÷ 560 = 0.4 and 89.6 ÷ 224 = 0.4, so r = 0.4 (geometric)", `${TT("n")} = ar<sup>n−1</sup> with a = 560`], a: `${TT("n")} = 560(0.4)<sup>n−1</sup>` },
+{ t: "genterm", q: `Find the general term of the sequence 5, 1, −3, −7, …`,
+  s: ["Each term is 4 less than the one before: d = −4 (arithmetic)", `${TT("n")} = 5 + (n − 1)(−4) = 5 − 4n + 4`], a: `${TT("n")} = 9 − 4n` },
+{ t: "genterm", q: `Find the general term of the sequence 12, 18, 27, …`,
+  s: ["18 ÷ 12 = 1.5 and 27 ÷ 18 = 1.5, so r = 1.5 (geometric)", `${TT("n")} = 12(1.5)<sup>n−1</sup>`], a: `${TT("n")} = 12(${F("3", "2")})<sup>n−1</sup>` },
+
+/* How many terms */
+{ t: "nterms", q: `How many terms are in the sequence 710 190, 236 730, 78 910, …, ${F("78 910", "2187")}?`,
+  s: ["236 730 ÷ 710 190 = ⅓ and 78 910 ÷ 236 730 = ⅓, so it is geometric", `${TT("n")} = 710 190(⅓)<sup>n−1</sup> = ${F("78 910", "2187")}`, "(⅓)<sup>n−1</sup> = 1 ÷ 19 683 = (⅓)<sup>9</sup>, so n − 1 = 9"], a: "n = 10" },
+{ t: "nterms", q: `How many terms are in the sequence −4, 8, 24, …, 2228?`,
+  s: ["First differences 12, 16; the second difference 4 is constant, so it is quadratic", `2a = 4, so a = 2 and ${TT("n")} = 2n² + bn + c`, `${TT("1")} = −4 and ${TT("2")} = 8 give b = 6 and c = −12, so ${TT("n")} = 2n² + 6n − 12`, "2n² + 6n − 12 = 2228 ⇒ n² + 3n − 1120 = 0 ⇒ (n − 32)(n + 35) = 0"], a: "n = 32 (reject n = −35)", also: ["quadcub"] },
+{ t: "nterms", q: `How many terms are in the sequence −7, −${F("31", "4")}, −${F("17", "2")}, …, −19?`,
+  s: ["d = −31/4 − (−7) = −¾ each time, so it is arithmetic", `${TT("n")} = −7 + (n − 1)(−¾)`, "−7 − ¾(n − 1) = −19 ⇒ n − 1 = 16"], a: "n = 17" },
+{ t: "nterms", q: `How many terms are in the sequence 2178, 726, 242, …, ${F("242", "59 049")}?`,
+  s: ["726 ÷ 2178 = ⅓ and 242 ÷ 726 = ⅓, so it is geometric", `2178(⅓)<sup>n−1</sup> = ${F("242", "59 049")}`, "(⅓)<sup>n−1</sup> = 1 ÷ 531 441 = (⅓)<sup>12</sup>, so n − 1 = 12"], a: "n = 13" },
+{ t: "nterms", q: `How many terms are in the sequence 560, 224, 89.6, …, 0.3670016?`,
+  s: ["r = 224 ÷ 560 = 0.4, so it is geometric", `560(0.4)<sup>n−1</sup> = 0.3670016`, "(0.4)<sup>n−1</sup> = 0.00065536 = (0.4)<sup>8</sup>"], a: "n = 9" },
+
+/* General term from given terms */
+{ t: "tnvals", q: `In a geometric sequence ${TT("4")} = −${F("27", "32")} and ${TT("7")} = −${F("729", "2048")}. Find the general term and write down the first four terms.`,
+  s: [`${TT("4")} = ar³ = −27/32 and ${TT("7")} = ar⁶ = −729/2048`, "Divide: r³ = 729/2048 ÷ 27/32 = 27/64, so r = ¾", "a(27/64) = −27/32 ⇒ a = −2"], a: `${TT("n")} = −2(${F("3", "4")})<sup>n−1</sup>; −2, −${F("3", "2")}, −${F("9", "8")}, −${F("27", "32")}` },
+{ t: "tnvals", q: `In an arithmetic sequence ${TT("3")} = 52 and ${TT("10")} = 213. Find the general term and write down the first four terms.`,
+  s: ["a + 2d = 52 and a + 9d = 213", "Subtract: 7d = 161, so d = 23", "a = 52 − 46 = 6"], a: `${TT("n")} = 23n − 17; 6, 29, 52, 75` },
+{ t: "tnvals", q: `In a geometric sequence ${TT("6")} = 32 and ${TT("9")} = 4. Find the general term and write down the first four terms.`,
+  s: ["ar⁵ = 32 and ar⁸ = 4", "Divide: r³ = 4/32 = 1/8, so r = ½", "a(½)⁵ = 32 ⇒ a = 1024"], a: `${TT("n")} = 1024(½)<sup>n−1</sup>; 1024, 512, 256, 128` },
+{ t: "tnvals", q: `A geometric sequence has ${TT("3")} = 32 and ${TT("6")} = ${F("32", "125")}. Find the general term.`,
+  s: ["ar² = 32 and ar⁵ = 32/125", "Divide: r³ = 1/125, so r = ⅕", "a(1/25) = 32 ⇒ a = 800"], a: `${TT("n")} = 800(${F("1", "5")})<sup>n−1</sup>` },
+{ t: "tnvals", q: `A geometric sequence with a positive common ratio has ${TT("5")} = 256 and ${TT("9")} = ${F("256", "81")}. Find the general term.`,
+  s: ["ar⁴ = 256 and ar⁸ = 256/81", "Divide: r⁴ = 1/81, and r > 0 gives r = ⅓", "a(1/81) = 256 ⇒ a = 20 736"], a: `${TT("n")} = 20 736(${F("1", "3")})<sup>n−1</sup>` },
+{ t: "tnvals", q: `In an arithmetic sequence ${TT("4")} = 11 and ${TT("9")} = 31. Find the general term.`,
+  s: ["a + 3d = 11 and a + 8d = 31", "Subtract: 5d = 20, so d = 4", "a = 11 − 12 = −1"], a: `${TT("n")} = 4n − 5` },
+
+/* Consecutive terms */
+{ t: "consec", q: `The expressions 2x − 10, 4x + 3, 10x − 8 are the first three terms of an arithmetic sequence. Find x and the general term.`,
+  s: [`${TT("2")} − ${TT("1")} = ${TT("3")} − ${TT("2")}`, "(4x + 3) − (2x − 10) = (10x − 8) − (4x + 3)", "2x + 13 = 6x − 11 ⇒ x = 6", "The terms are 2, 27, 52, so a = 2 and d = 25"], a: `x = 6; ${TT("n")} = 25n − 23` },
+{ t: "consec", q: `The expressions x + 2, x, x − 1 are the first three terms of a geometric sequence. Find x and the general term.`,
+  s: [`${TT("2")} ÷ ${TT("1")} = ${TT("3")} ÷ ${TT("2")}`, "x/(x + 2) = (x − 1)/x ⇒ x² = x² + x − 2", "x = 2, so the terms are 4, 2, 1 and r = ½"], a: `x = 2; ${TT("n")} = 4(½)<sup>n−1</sup>` },
+{ t: "consec", q: `The expressions 4x + 36, 2x − 8, x − 22 are the first three terms of an arithmetic sequence. Find x and the general term.`,
+  s: ["(2x − 8) − (4x + 36) = (x − 22) − (2x − 8)", "−2x − 44 = −x − 14 ⇒ x = −30", "The terms are −84, −68, −52, so a = −84 and d = 16"], a: `x = −30; ${TT("n")} = 16n − 100` },
+{ t: "consec", q: `The expressions x + 1, 3x − 1, 6x are three consecutive terms of an arithmetic sequence. Find x and the general term.`,
+  s: ["(3x − 1) − (x + 1) = 6x − (3x − 1)", "2x − 2 = 3x + 1 ⇒ x = −3", "The terms are −2, −10, −18, so a = −2 and d = −8"], a: `x = −3; ${TT("n")} = −8n + 6` },
+{ t: "consec", q: `The expressions x + 4, 4x, 6x + 8 are consecutive terms of a geometric sequence. Find the possible values of x.`,
+  s: [`${TT("2")} ÷ ${TT("1")} = ${TT("3")} ÷ ${TT("2")}, so (4x)² = (x + 4)(6x + 8)`, "16x² = 6x² + 32x + 32 ⇒ 5x² − 16x − 16 = 0", "(5x + 4)(x − 4) = 0"], a: `x = 4 (terms 8, 16, 32) or x = −${F("4", "5")} (terms 3.2, −3.2, 3.2)` },
+
+/* Proving arithmetic or geometric */
+{ t: "prove", q: `Prove that the sequence ${TT("n")} = ${F("3n − 4", "5")} is linear (arithmetic), and say whether it is increasing or decreasing.`,
+  s: [`${TT("n+1")} = (3(n + 1) − 4)/5 = (3n − 1)/5`, `${TT("n+1")} − ${TT("n")} = (3n − 1)/5 − (3n − 4)/5 = 3/5, a constant`, "d = ⅗ is positive"], a: "Arithmetic with d = ⅗, so it is increasing" },
+{ t: "prove", q: `Prove that the sequence ${TT("n")} = 0.02(3<sup>4n</sup>) is geometric, and say whether it is increasing or decreasing.`,
+  s: [`${TT("n+1")} = 0.02(3<sup>4n+4</sup>)`, `${TT("n+1")} ÷ ${TT("n")} = 3<sup>4n+4</sup> ÷ 3<sup>4n</sup> = 3⁴ = 81, a constant`, "r = 81 > 1 and the terms are positive"], a: "Geometric with r = 81, so it is increasing" },
+{ t: "prove", q: `Prove that the sequence ${TT("n")} = ${F("7 − 8n", "6")} is arithmetic, and say whether it is increasing or decreasing.`,
+  s: [`${TT("n+1")} = (7 − 8(n + 1))/6 = (−8n − 1)/6`, `${TT("n+1")} − ${TT("n")} = (−8n − 1)/6 − (7 − 8n)/6 = −8/6 = −4/3`, "The difference is constant and negative"], a: `Arithmetic with d = −${F("4", "3")}, so it is decreasing` },
+{ t: "prove", q: `Prove that the sequence with general term ${TT("n")} = 4n − 1 is arithmetic.`,
+  s: [`${TT("n+1")} = 4(n + 1) − 1 = 4n + 3`, `${TT("n+1")} − ${TT("n")} = (4n + 3) − (4n − 1) = 4`], a: "The common difference is 4, so it is arithmetic" },
+{ t: "prove", q: `The general term of the sequence 560, 224, 89.6, … is ${TT("n")} = 560(0.4)<sup>n−1</sup>. Prove that the sequence is geometric.`,
+  s: [`${TT("n+1")} = 560(0.4)<sup>n</sup>`, `${TT("n+1")} ÷ ${TT("n")} = 560(0.4)<sup>n</sup> ÷ 560(0.4)<sup>n−1</sup> = 0.4`], a: "The common ratio is 0.4, so it is geometric (and decreasing)" },
+
+/* Product and sum of three terms */
+{ t: "prodsum", q: `The product of the first three terms of a geometric sequence is 13 824 and their sum is 172. Given that the common ratio is greater than 1, find the general term and the first three terms.`,
+  s: ["Let the terms be a/r, a, ar. Product: a³ = 13 824, so a = 24", "Sum: 24/r + 24 + 24r = 172 ⇒ 6r² − 37r + 6 = 0", "(6r − 1)(r − 6) = 0 ⇒ r = 6 (since r > 1)", "The first term is 24/6 = 4"], a: `${TT("n")} = 4(6)<sup>n−1</sup>; 4, 24, 144` },
+{ t: "prodsum", q: `The sum of three consecutive terms of a geometric sequence is 42 and their product is 1728. Find the general term.`,
+  s: ["Let the terms be a/r, a, ar. Product: a³ = 1728, so a = 12", "Sum: 12/r + 12 + 12r = 42 ⇒ 2r² − 5r + 2 = 0", "(2r − 1)(r − 2) = 0 ⇒ r = ½ or r = 2"], a: `${TT("n")} = 12(2)<sup>n−1</sup> or ${TT("n")} = 12(½)<sup>n−1</sup> (the same three terms in reverse order)` },
+{ t: "prodsum", q: `The product of the first three terms of a geometric sequence is 3375 and their sum is 93. Given that r > 1, find the sum of the first four terms.`,
+  s: ["Let the terms be a/r, a, ar. Product: a³ = 3375, so a = 15", "Sum: 15/r + 15 + 15r = 93 ⇒ 5r² − 26r + 5 = 0 ⇒ (5r − 1)(r − 5) = 0", "r = 5, so the first term is 3 and the terms are 3, 15, 75, 375", `${"S<sub>4</sub>"} = 3(5⁴ − 1)/(5 − 1)`], a: "468", also: ["finite"] },
+{ t: "prodsum", q: `The sum of three consecutive terms of an arithmetic sequence is 27 and their product is 693. Given that the common difference is positive, find the three terms.`,
+  s: ["Let the terms be a − d, a, a + d. Sum: 3a = 27, so a = 9", "Product: 9(81 − d²) = 693 ⇒ 81 − d² = 77 ⇒ d² = 4", "d = 2 (positive)"], a: "7, 9, 11" },
+{ t: "prodsum", q: `The product of three consecutive terms of a geometric sequence is 216 and their sum is 26. Given that r > 1, find the general term.`,
+  s: ["Let the terms be a/r, a, ar. Product: a³ = 216, so a = 6", "Sum: 6/r + 6 + 6r = 26 ⇒ 3r² − 10r + 3 = 0 ⇒ (3r − 1)(r − 3) = 0", "r = 3 (since r > 1), so the terms are 2, 6, 18"], a: `${TT("n")} = 2(3)<sup>n−1</sup>` },
+
+/* Sum of a finite series */
+{ t: "finite", q: `Find the sum of the series √3 + 3 + 3√3 + … + 729.`,
+  s: ["3 ÷ √3 = √3, so it is geometric with a = √3 and r = √3", `${TT("n")} = (√3)<sup>n</sup> = 729 = (√3)<sup>12</sup>, so n = 12`, `${"S<sub>12</sub>"} = √3(1 − (√3)<sup>12</sup>)/(1 − √3) = √3(1 − 729)/(1 − √3)`], a: "≈ 1722.47" },
+{ t: "finite", q: `Find the sum of the series −400 + (−397) + … + (−43).`,
+  s: ["d = 3, so it is arithmetic with a = −400", `${TT("n")} = −400 + 3(n − 1) = −43 ⇒ n = 120`, `${"S<sub>120</sub>"} = 60(2(−400) + 119(3)) = 60(−443)`], a: "−26 580" },
+{ t: "finite", q: `Find the sum of the terms of the sequence 2178, 726, 242, …, ${F("242", "59 049")}, correct to the nearest whole number.`,
+  s: ["Geometric with a = 2178 and r = ⅓", "Last term: (⅓)<sup>n−1</sup> = 1/531 441 = (⅓)<sup>12</sup>, so n = 13", `${"S<sub>13</sub>"} = 2178(1 − (⅓)<sup>13</sup>)/(1 − ⅓)`], a: "≈ 3267" },
+{ t: "finite", q: `Find the sum of the first 12 terms of the series 3 + 7 + 11 + …`,
+  s: ["Arithmetic with a = 3 and d = 4", `${"S<sub>12</sub>"} = (12/2)(2(3) + 11(4)) = 6(50)`], a: "300" },
+{ t: "finite", q: `Find the sum of the series 100 − 50 + 25 − … − ${F("25", "512")}.`,
+  s: ["Geometric with a = 100 and r = −½", "100(−½)<sup>n−1</sup> = −25/512 ⇒ (−½)<sup>n−1</sup> = −1/2048 = (−½)<sup>11</sup>, so n = 12", `${"S<sub>12</sub>"} = 100(1 − (−½)<sup>12</sup>)/(1 + ½)`], a: `${F("34 125", "512")} ≈ 66.65` },
+
+/* Sum to infinity */
+{ t: "sinf", q: `Find the sum of the series 32 + 16 + 8 + 4 + …`,
+  s: ["Geometric with a = 32 and r = ½", "|r| < 1, so the series has a sum to infinity", `${"S<sub>∞</sub>"} = a/(1 − r) = 32/(1 − 0.5)`], a: "64" },
+{ t: "sinf", q: `Show, using the sum to infinity of a geometric series, that ${SG("n = 1", "∞", "(0.25)<sup>n</sup>")} = ${F("1", "3")}.`,
+  s: ["The terms are 0.25 + 0.0625 + 0.015625 + …, so a = 0.25 and r = 0.25", `${"S<sub>∞</sub>"} = a/(1 − r) = 0.25/(1 − 0.25) = 0.25/0.75`], a: `${F("1", "3")}`, also: ["sigma"] },
+{ t: "sinf", q: `The first term of a geometric series is 12 and its sum to infinity is 48. Find the common ratio.`,
+  s: [`${"S<sub>∞</sub>"} = a/(1 − r)`, "48 = 12/(1 − r) ⇒ 1 − r = ¼"], a: `r = ${F("3", "4")}` },
+{ t: "sinf", q: `Find the values of x for which the series 1 + 2x + 4x² + 8x³ + … has a sum to infinity, and find the sum when x = ¼.`,
+  s: ["Geometric with a = 1 and r = 2x", "A sum to infinity needs |r| < 1: |2x| < 1", "When x = ¼, r = ½ and S<sub>∞</sub> = 1/(1 − ½)"], a: `−½ < x < ½; sum = 2` },
+{ t: "sinf", q: `A ball is dropped from a height of 10 m. Each time it hits the ground it rebounds to ¾ of its previous height. Find the total distance it travels before coming to rest.`,
+  s: ["Down 10 m, then up and down for each rebound", "Each rebound height: 7.5, 5.625, … is geometric with a = 7.5 and r = ¾", "Up and down: 2 × S<sub>∞</sub> = 2 × 7.5/(1 − ¾) = 60", "Total = 10 + 60"], a: "70 m" },
+
+/* Recurring decimals */
+{ t: "recdec", q: `Write 0.9̇ as an infinite geometric series and hence write it as a fraction.`,
+  s: ["0.9̇ = 0.9 + 0.09 + 0.009 + …", "a = 0.9 and r = 0.1", `${"S<sub>∞</sub>"} = 0.9/(1 − 0.1) = 0.9/0.9`], a: "0.9̇ = 1" },
+{ t: "recdec", q: `Write 1.23̇ as the sum of an infinite geometric series and hence write it as a fraction.`,
+  s: ["1.23̇ = 1.2 + 0.03̇, and 0.03̇ = 0.03 + 0.003 + 0.0003 + …", "a = 0.03 and r = 0.1, so S<sub>∞</sub> = 0.03/0.9 = 1/30", "1.2 + 1/30 = 36/30 + 1/30"], a: `${F("37", "30")}` },
+{ t: "recdec", q: `Write 0.5̇26̇ as the sum of an infinite geometric series and hence write it as a fraction.`,
+  s: ["0.5̇26̇ = 0.526 + 0.000526 + 0.000000526 + …", "a = 0.526 and r = 0.001", `${"S<sub>∞</sub>"} = 0.526/(1 − 0.001) = 0.526/0.999`], a: `${F("526", "999")}` },
+{ t: "recdec", q: `Write 0.2̇3̇ as the sum of an infinite geometric series and hence write it as a fraction.`,
+  s: ["0.2̇3̇ = 0.23 + 0.0023 + 0.000023 + …", "a = 0.23 and r = 0.01", `${"S<sub>∞</sub>"} = 0.23/(1 − 0.01) = 0.23/0.99`], a: `${F("23", "99")}` },
+
+/* Sigma notation */
+{ t: "sigma", q: `Evaluate ${SG("r = 1", "5", "(2r − 4)")}.`,
+  s: ["Substitute r = 1, 2, 3, 4, 5 into 2r − 4", "−2, 0, 2, 4, 6", "−2 + 0 + 2 + 4 + 6"], a: "10" },
+{ t: "sigma", q: `Evaluate ${SG("r = 0", "6", "r²")}.`,
+  s: ["Substitute r = 0, 1, 2, 3, 4, 5, 6 into r²", "0 + 1 + 4 + 9 + 16 + 25 + 36"], a: "91" },
+{ t: "sigma", q: `Evaluate ${SG("r = 0", "4", "(2r + 4)")}.`,
+  s: ["Substitute r = 0, 1, 2, 3, 4 into 2r + 4", "4 + 6 + 8 + 10 + 12"], a: "40" },
+{ t: "sigma", q: `Write the series 100 − 50 + 25 − … − ${F("25", "512")} using sigma notation.`,
+  s: ["Geometric with a = 100 and r = −½, so the general term is 100(−½)<sup>n−1</sup>", "The last term −25/512 is the 12th term (n = 12)"], a: `${SG("n = 1", "12", "100(−½)<sup>n−1</sup>")}` },
+{ t: "sigma", q: `Write 3 + 7 + 11 + … + 39 using sigma notation and find its value.`,
+  s: ["Arithmetic with a = 3 and d = 4, so the general term is 4r − 1", "4r − 1 = 39 ⇒ r = 10", "Sum = 10/2 × (3 + 39)"], a: `${SG("r = 1", "10", "(4r − 1)")} = 210` },
+
+/* Tn from Sn */
+{ t: "tnsn", q: `The sum of the first n terms of an arithmetic sequence is ${"S<sub>n</sub>"} = 2n² + 5n. Find the general term.`,
+  s: [`${TT("n")} = ${"S<sub>n</sub>"} − ${"S<sub>n−1</sub>"}`, `${"S<sub>n−1</sub>"} = 2(n − 1)² + 5(n − 1) = 2n² + n − 3`, "(2n² + 5n) − (2n² + n − 3) = 4n + 3"], a: `${TT("n")} = 4n + 3` },
+{ t: "tnsn", q: `Given that ${"S<sub>n</sub>"} = 3n² + 2n is the sum of the first n terms of an arithmetic sequence, find the general term.`,
+  s: [`${TT("n")} = ${"S<sub>n</sub>"} − ${"S<sub>n−1</sub>"}`, `${"S<sub>n−1</sub>"} = 3(n − 1)² + 2(n − 1) = 3n² − 4n + 1`, "(3n² + 2n) − (3n² − 4n + 1) = 6n − 1"], a: `${TT("n")} = 6n − 1` },
+{ t: "tnsn", q: `${"S<sub>n</sub>"} = 3n² + n gives the sum of the first n terms of an arithmetic sequence. Find ${TT("n")}.`,
+  s: [`${TT("1")} = ${"S<sub>1</sub>"} = 4, and ${"S<sub>2</sub>"} = 14, so ${TT("2")} = 14 − 4 = 10`, "a = 4 and d = 6", `${TT("n")} = 4 + 6(n − 1)`], a: `${TT("n")} = 6n − 2` },
+{ t: "tnsn", q: `In an arithmetic sequence ${TT("4")} = 30 and ${"S<sub>4</sub>"} = 72. Find ${"S<sub>8</sub>"}.`,
+  s: ["a + 3d = 30", `${"S<sub>4</sub>"} = 2(2a + 3d) = 72 ⇒ 2a + 3d = 36`, "Subtract: a = 6, then d = 8", `${"S<sub>8</sub>"} = 4(2(6) + 7(8)) = 4(68)`], a: "272", also: ["tnvals"] },
+{ t: "tnsn", q: `The sum of the first n terms of an arithmetic sequence is ${"S<sub>n</sub>"} = 5n² − 2n. Find ${TT("10")}.`,
+  s: [`${TT("n")} = ${"S<sub>n</sub>"} − ${"S<sub>n−1</sub>"} = (5n² − 2n) − (5n² − 12n + 7) = 10n − 7`, `${TT("10")} = 10(10) − 7`], a: "93" },
+
+/* Quadratic and cubic sequences */
+{ t: "quadcub", q: `A quadratic sequence has ${TT("2")} = 4, ${TT("4")} = 4 and ${TT("6")} = 12. Find the general term and the first four terms.`,
+  s: [`${TT("n")} = an² + bn + c, so 4a + 2b + c = 4, 16a + 4b + c = 4 and 36a + 6b + c = 12`, "Subtract: 12a + 2b = 0 and 20a + 2b = 8", "8a = 8 ⇒ a = 1, then b = −6 and c = 12"], a: `${TT("n")} = n² − 6n + 12; 7, 4, 3, 4` },
+{ t: "quadcub", q: `Write the sequence 9, 29, 81, 177, 329 in the form ${TT("n")} = an³ + bn² + cn + d.`,
+  s: ["Differences: 20, 52, 96, 152, then 32, 44, 56, then 12, 12", "Third difference = 6a = 12 ⇒ a = 2", `${TT("1")}, ${TT("2")}, ${TT("3")} give b + c + d = 7, 4b + 2c + d = 13 and 9b + 3c + d = 27`, "Solving: b = 4, c = −6, d = 9"], a: `${TT("n")} = 2n³ + 4n² − 6n + 9` },
+{ t: "quadcub", q: `Write the sequence −12, −14, −12, 0, 28 in the form ${TT("n")} = an³ + bn² + cn + d.`,
+  s: ["Differences: −2, 2, 12, 28, then 4, 10, 16, then 6, 6", "Third difference = 6a = 6 ⇒ a = 1", `Using ${TT("1")}, ${TT("2")} and ${TT("3")} gives b + c + d = −13, 4b + 2c + d = −22 and 9b + 3c + d = −39`, "Solving: b = −4, c = 3, d = −12"], a: `${TT("n")} = n³ − 4n² + 3n − 12` },
+{ t: "quadcub", q: `The pattern 4, 13, 38, 85, 160 can be modelled by ${TT("n")} = an³ + 2n² + bn + 5. Find a and b.`,
+  s: ["Differences: 9, 25, 47, 75, then 16, 22, 28, then 6, 6", "Third difference = 6a = 6 ⇒ a = 1", `${TT("1")} = 1 + 2 + b + 5 = 4`], a: "a = 1, b = −4" },
+{ t: "quadcub", q: `Find the general term of the quadratic sequence 5, 12, 23, 38, …`,
+  s: ["First differences 7, 11, 15; second difference 4 (constant)", `2a = 4 ⇒ a = 2, so ${TT("n")} = 2n² + bn + c`, `${TT("1")} = 5 ⇒ b + c = 3 and ${TT("2")} = 12 ⇒ 2b + c = 4, so b = 1 and c = 2`], a: `${TT("n")} = 2n² + n + 2` },
+
+/* Recurrence relations */
+{ t: "recur", q: `The Fibonacci sequence is given by ${TT("n")} = ${TT("n−1")} + ${TT("n−2")} with first terms 0, 1, 1. Write out the next six terms.`,
+  s: ["Each term is the sum of the two before it", "1 + 1 = 2, 1 + 2 = 3, 2 + 3 = 5, 3 + 5 = 8, 5 + 8 = 13, 8 + 13 = 21"], a: "2, 3, 5, 8, 13, 21" },
+{ t: "recur", q: `Write a recurrence relation for the sequence in which two times the current term, minus the previous term, gives the next term.`,
+  s: [`Next term = 2 × (current term) − (previous term)`], a: `${TT("n+1")} = 2${TT("n")} − ${TT("n−1")}  (or ${TT("n")} = 2${TT("n−1")} − ${TT("n−2")})` },
+{ t: "recur", q: `Describe in words the recurrence relation ${TT("n")} = 2${TT("n−2")} + 3${TT("n−1")}.`,
+  s: [`${TT("n−1")} is the previous term and ${TT("n−2")} is the term before that`], a: "Each term is three times the previous term plus twice the term before that" },
+{ t: "recur", q: `A sequence is defined by ${"G<sub>n</sub>"} = 3${"G<sub>n−1</sub>"} + (${"G<sub>n−2</sub>"})² with ${"G<sub>1</sub>"} = 1 and ${"G<sub>2</sub>"} = 1. Write down the first five terms.`,
+  s: ["G<sub>3</sub> = 3(1) + 1² = 4", "G<sub>4</sub> = 3(4) + 1² = 13", "G<sub>5</sub> = 3(13) + 4² = 55"], a: "1, 1, 4, 13, 55" },
+{ t: "recur", q: `A sequence is defined by ${TT("1")} = 2 and ${TT("n+1")} = 3${TT("n")} − 1. Write down the first four terms.`,
+  s: [`${TT("2")} = 3(2) − 1 = 5`, `${TT("3")} = 3(5) − 1 = 14`, `${TT("4")} = 3(14) − 1 = 41`], a: "2, 5, 14, 41" },
+/* ===== Complex Numbers ===== */
+
+/* Transformations */
+{ t: "cxtrans", q: `Plot z = 1 − 2i and w = 3i on an Argand diagram. Work out 3z, z + w and z × w, and state the type of transformation each one represents.`,
+  s: ["3z = 3(1 − 2i) = 3 − 6i: every part is scaled by 3, so the modulus is multiplied by 3", "z + w = 1 − 2i + 3i = 1 + i: three units are added to the imaginary part", "z × w = 3i(1 − 2i) = 3i − 6i² = 6 + 3i: multiplying by 3i scales by 3 and rotates 90° anticlockwise"],
+  a: "3z = 3 − 6i (scaling by 3); z + w = 1 + i (translation up 3); zw = 6 + 3i (scaling by 3 and a 90° anticlockwise rotation)" },
+{ t: "cxtrans", q: `Given |m| = 4 and arg(m) = 120°, find the value of i⁴⁵ × m in the form a + bi. Explain what has happened geometrically to m.`,
+  s: ["i⁴⁵ = (i⁴)¹¹ × i = i", "m = 4(cos 120° + i sin 120°) = −2 + 2√3 i", "i × m = −2√3 − 2i. Multiplying by i is a 90° anticlockwise rotation about the origin; the modulus stays 4 and the argument becomes 210°"],
+  a: `i⁴⁵m = −2${SQ(3)} − 2i: m is rotated 90° anticlockwise about the origin` },
+{ t: "cxtrans", q: `Write 4i³ + 7i⁹ in the form bi, where b ∈ ℤ.`,
+  s: ["i³ = −i (three quarter-turns anticlockwise)", "i⁹ = (i⁴)² × i = i", "4(−i) + 7(i) = −4i + 7i"],
+  a: "3i" },
+{ t: "cxtrans", q: `The complex number u = a + bi lies in the second quadrant. Write iu and the conjugate of iu in terms of a and b, and state a transformation (not a translation) that sends u to the conjugate of iu.`,
+  s: ["iu = i(a + bi) = ai + bi² = −b + ai", `conjugate of iu = −b − ai`, "u to iu is a 90° anticlockwise rotation about the origin; changing the sign of the imaginary part is then a reflection in the real axis"],
+  a: `iu = −b + ai and ${CJ("iu")} = −b − ai. Rotate u by 90° anticlockwise, then reflect in the real axis (equivalently, reflect u in the line y = −x)` },
+{ t: "cxtrans", q: `Describe fully what happens to z = 4 + 2i when it is multiplied by 1 + i.`,
+  s: ["z(1 + i) = (4 + 2i)(1 + i) = 4 + 4i + 2i + 2i² = 2 + 6i", `1 + i has modulus ${SQ(2)} and argument 45°`, "So z is scaled by √2 and rotated 45° anticlockwise"],
+  a: `z(1 + i) = 2 + 6i: scaled by ${SQ(2)} and rotated 45° anticlockwise about the origin` },
+{ t: "cxtrans", q: `A point z = 2 + 5i is moved to 5 + 3i by adding a complex number. Find that number and describe the translation.`,
+  s: ["Added number = (5 + 3i) − (2 + 5i)", "= 3 − 2i"],
+  a: "3 − 2i: a translation of 3 units to the right and 2 units down" },
+
+/* Division */
+{ t: "cxdiv", q: `Write ${F("2i(3 + 4i)", "2 + 3i")} in the form a + bi, where a, b ∈ ℝ.`,
+  s: ["Top: 2i(3 + 4i) = 6i + 8i² = −8 + 6i", "Multiply top and bottom by the conjugate 2 − 3i", `(−8 + 6i)(2 − 3i) = −16 + 24i + 12i − 18i² = 2 + 36i and (2 + 3i)(2 − 3i) = 13`],
+  a: `${F(2, 13)} + ${F(36, 13)}i` },
+{ t: "cxdiv", q: `Simplify ${F("(2 − 6i) − (3 + 2i)", "2 + 2i")}.`,
+  s: ["Top: (2 − 6i) − (3 + 2i) = −1 − 8i", "Multiply by the conjugate 2 − 2i over 2 − 2i", "(−1 − 8i)(2 − 2i) = −2 + 2i − 16i + 16i² = −18 − 14i and (2 + 2i)(2 − 2i) = 8"],
+  a: `−${F(9, 4)} − ${F(7, 4)}i` },
+{ t: "cxdiv", q: `${F("4 − 2i", "2 + 4i")} = 0 + ki, where k ∈ ℤ and i² = −1. Find the value of k.`,
+  s: ["Multiply top and bottom by the conjugate 2 − 4i", "(4 − 2i)(2 − 4i) = 8 − 16i − 4i + 8i² = −20i and (2 + 4i)(2 − 4i) = 20", "−20i ÷ 20 = −i = 0 + (−1)i"],
+  a: "k = −1" },
+{ t: "cxdiv", q: `Write ${F("7 + i", "1 + i")} in the form a + bi, where a, b ∈ ℝ.`,
+  s: ["Multiply top and bottom by the conjugate 1 − i", "(7 + i)(1 − i) = 7 − 7i + i − i² = 8 − 6i and (1 + i)(1 − i) = 2", "(8 − 6i) ÷ 2"],
+  a: "4 − 3i" },
+{ t: "cxdiv", q: `Write ${F("5 + 5i", "3 − 4i")} in the form a + bi, where a, b ∈ ℝ.`,
+  s: ["Multiply top and bottom by the conjugate 3 + 4i", "(5 + 5i)(3 + 4i) = 15 + 20i + 15i + 20i² = −5 + 35i and (3 − 4i)(3 + 4i) = 25", "Divide each part by 25"],
+  a: `−${F(1, 5)} + ${F(7, 5)}i` },
+
+/* Equality */
+{ t: "cxeq", q: `Write √(3 + 4i) in the form a ± bi, where a, b ∈ ℝ.`,
+  s: ["Let √(3 + 4i) = a + bi and square both sides: 3 + 4i = a² − b² + 2abi", "Equate parts: a² − b² = 3 and 2ab = 4, so b = 2/a", "a² − 4/a² = 3 gives a⁴ − 3a² − 4 = 0, so (a² − 4)(a² + 1) = 0 and a = ±2 (a is real)", "a = 2 gives b = 1; a = −2 gives b = −1"],
+  a: "±(2 + i)" },
+{ t: "cxeq", q: `Find √(−5 + 12i). Give both answers in the form a + bi, where a, b ∈ ℝ.`,
+  s: ["Let (a + bi)² = −5 + 12i, so a² − b² = −5 and 2ab = 12", "b = 6/a gives a⁴ + 5a² − 36 = 0, so (a² + 9)(a² − 4) = 0 and a = ±2", "a = 2 gives b = 3; a = −2 gives b = −3"],
+  a: "2 + 3i and −2 − 3i" },
+{ t: "cxeq", q: `Find the real numbers x and y such that (x + yi)(2 − i) = 5 + 5i.`,
+  s: ["Expand: 2x − xi + 2yi − yi² = (2x + y) + (2y − x)i", "Equate parts: 2x + y = 5 and 2y − x = 5", "Solving gives x = 1 and y = 3"],
+  a: "x = 1, y = 3" },
+{ t: "cxeq", q: `Find the complex number z such that z + 2${CJ("z")} = 9 − 4i.`,
+  s: ["Let z = a + bi, so z̄ = a − bi", "z + 2z̄ = 3a − bi", "3a = 9 and −b = −4"],
+  a: "z = 3 + 4i" },
+{ t: "cxeq", q: `Find the values of k ∈ ℝ for which (2 + ki)² is purely imaginary.`,
+  s: ["(2 + ki)² = 4 + 4ki + k²i² = (4 − k²) + 4ki", "Purely imaginary means the real part is zero: 4 − k² = 0"],
+  a: "k = 2 or k = −2" },
+
+/* Modulus and conjugate */
+{ t: "cxmod", q: `If |3 + 4i + k + 2i| = 10, find the values of k ∈ ℝ.`,
+  s: ["Collect: |(3 + k) + 6i| = 10", "(3 + k)² + 36 = 100, so (3 + k)² = 64", "3 + k = ±8"],
+  a: "k = 5 or k = −11" },
+{ t: "cxmod", q: `Show that 1/z = ${F(CJ("z"), "|z|²")}, where z is any non-zero complex number.`,
+  s: ["Let z = a + bi. Then 1/z = 1/(a + bi) × (a − bi)/(a − bi)", "= (a − bi)/(a² + b²), since (a + bi)(a − bi) = a² + b²", "a − bi = z̄ and a² + b² = |z|²"],
+  a: `1/z = ${F(CJ("z"), "|z|²")}` },
+{ t: "cxmod", q: `Find |(3 − 4i)(1 + i)|.`,
+  s: ["Multiply out: (3 − 4i)(1 + i) = 3 + 3i − 4i − 4i² = 7 − i", "|7 − i| = √(49 + 1)"],
+  a: `${SQ(50)} = 5${SQ(2)}` },
+{ t: "cxmod", q: `Given z = 2 − 3i, write down the conjugate of z and find z × (conjugate of z).`,
+  s: ["The conjugate changes the sign of the imaginary part: 2 + 3i", "(2 − 3i)(2 + 3i) = 4 − 9i² = 4 + 9"],
+  a: `${CJ("z")} = 2 + 3i and z${CJ("z")} = 13 (which is |z|²)` },
+{ t: "cxmod", q: `Find all complex numbers z = a + bi with |z| = 5 and real part 3.`,
+  s: ["a = 3, so |z|² = 9 + b² = 25", "b² = 16"],
+  a: "z = 3 + 4i or z = 3 − 4i" },
+
+/* Complex roots of equations */
+{ t: "cxroots", q: `Solve x² − 2x + 17 = 0 and give your answers in the form a + bi, where a, b ∈ ℝ.`,
+  s: ["x = (2 ± √(4 − 68))/2 = (2 ± √(−64))/2", "√(−64) = 8i", "x = (2 ± 8i)/2"],
+  a: "x = 1 + 4i or x = 1 − 4i" },
+{ t: "cxroots", q: `Show that −2 + 2i is a root of z³ + 3z² + 4z − 8 = 0 and find the other roots.`,
+  s: ["(−2 + 2i)² = −8i and (−2 + 2i)³ = 16 + 16i", "16 + 16i + 3(−8i) + 4(−2 + 2i) − 8 = 0, so it is a root", "The coefficients are real, so −2 − 2i is also a root. These give the factor z² + 4z + 8", "(z² + 4z + 8)(z − 1) = z³ + 3z² + 4z − 8, so the third root is 1"],
+  a: "The other roots are −2 − 2i and 1" },
+{ t: "cxroots", q: `z = 3 − 5i is a root of f(z) = 3z³ − 14z² + 78z + 136. Find the other two roots and state clearly any theorem you use.`,
+  s: ["The coefficients are real, so by the Conjugate Root Theorem 3 + 5i is also a root", "(z − 3 + 5i)(z − 3 − 5i) = z² − 6z + 34", "(z² − 6z + 34)(3z + 4) = 3z³ − 14z² + 78z + 136, so the last root comes from 3z + 4 = 0"],
+  a: `3 + 5i (Conjugate Root Theorem) and −${F(4, 3)}` },
+{ t: "cxroots", q: `z = 2 + i is a root of f(z) = z² − z − 1 − 3i. Find the other root.`,
+  s: ["The coefficients are not all real, so the conjugate is not necessarily a root", "The sum of the roots is 1 (minus the coefficient of z), so the other root is 1 − (2 + i)", "Check with the product: (2 + i)(−1 − i) = −1 − 3i ✓"],
+  a: "z = −1 − i" },
+{ t: "cxroots", q: `z₁ = 1 + i is a root of z² + (3 − 2i)z + p = 0. Find p, where p = a + bi and a, b ∈ ℤ.`,
+  s: ["Substitute z = 1 + i: (1 + i)² + (3 − 2i)(1 + i) + p = 0", "(1 + i)² = 2i and (3 − 2i)(1 + i) = 5 + i", "2i + 5 + i + p = 0"],
+  a: "p = −5 − 3i" },
+{ t: "cxroots", q: `Show that z = 2 + i is a root of 3z³ − 14z² + 23z − 10 and hence find the other two roots.`,
+  s: ["3(2 + i)³ − 14(2 + i)² + 23(2 + i) − 10 = 0, so it is a root", "By the Conjugate Root Theorem 2 − i is also a root, giving the factor z² − 4z + 5", "(z² − 4z + 5)(3z − 2) = 3z³ − 14z² + 23z − 10, so the last root comes from 3z − 2 = 0"],
+  a: `2 − i and ${F(2, 3)}` },
+
+/* Converting to polar form */
+{ t: "topolar", q: `Write 6 − 2i in polar form, with the angle rounded to the nearest degree.`,
+  s: [`|z| = √(36 + 4) = √40 = 2${SQ(10)}`, "tan⁻¹(2/6) ≈ 18.4°, and 6 − 2i is in the fourth quadrant", "θ = 360° − 18° = 342°"],
+  a: `2${SQ(10)}(cos 342° + i sin 342°)` },
+{ t: "topolar", q: `Write −3 − 3i in polar form, with the angle rounded to the nearest degree.`,
+  s: [`|z| = √(9 + 9) = 3${SQ(2)}`, "tan⁻¹(3/3) = 45°, and −3 − 3i is in the third quadrant", "θ = 180° + 45° = 225°"],
+  a: `3${SQ(2)}(cos 225° + i sin 225°)` },
+{ t: "topolar", q: `Write −2 in polar form.`,
+  s: ["|z| = 2", "−2 lies on the negative real axis, so the angle is 180°"],
+  a: `2(cos 180° + i sin 180°)` },
+{ t: "topolar", q: `Write −5 + 2i in polar form.`,
+  s: [`|w| = √(25 + 4) = ${SQ(29)}`, "tan⁻¹(2/5) ≈ 21.8°, and −5 + 2i is in the second quadrant", "θ = 180° − 21.8° = 158.2°"],
+  a: `${SQ(29)}(cos 158.2° + i sin 158.2°)` },
+{ t: "topolar", q: `Write −√3 + i in polar form.`,
+  s: ["|z| = √(3 + 1) = 2", "tan⁻¹(1/√3) = 30°, and the number is in the second quadrant", "θ = 180° − 30° = 150°"],
+  a: `2(cos 150° + i sin 150°)` },
+
+/* Converting to rectangular form */
+{ t: "torect", q: `Write 4(cos 60° + i sin 60°) in the form a + bi.`,
+  s: [`cos 60° = ${F(1, 2)} and sin 60° = ${F(SQ(3), 2)}`, `4 × ${F(1, 2)} = 2 and 4 × ${F(SQ(3), 2)} = 2${SQ(3)}`],
+  a: `2 + 2${SQ(3)}i` },
+{ t: "torect", q: `Write 6(cos 135° + i sin 135°) in the form a + bi.`,
+  s: [`cos 135° = −${F(SQ(2), 2)} and sin 135° = ${F(SQ(2), 2)}`, `6 × ${F(SQ(2), 2)} = 3${SQ(2)}`],
+  a: `−3${SQ(2)} + 3${SQ(2)}i` },
+{ t: "torect", q: `Write 2(cos 210° + i sin 210°) in the form a + bi.`,
+  s: [`210° is in the third quadrant: cos 210° = −${F(SQ(3), 2)} and sin 210° = −${F(1, 2)}`, "Multiply each by 2"],
+  a: `−${SQ(3)} − i` },
+{ t: "torect", q: `Write 5(cos 270° + i sin 270°) in the form a + bi.`,
+  s: ["cos 270° = 0 and sin 270° = −1", "5(0 + i(−1))"],
+  a: "−5i" },
+{ t: "torect", q: `Write 8(cos(2π/3) + i sin(2π/3)) in the form a + bi.`,
+  s: [`cos(2π/3) = −${F(1, 2)} and sin(2π/3) = ${F(SQ(3), 2)}`, `8 × −${F(1, 2)} = −4 and 8 × ${F(SQ(3), 2)} = 4${SQ(3)}`],
+  a: `−4 + 4${SQ(3)}i` },
+
+/* Multiplying and dividing in polar form */
+{ t: "polarmd", q: `Given |m| = 4 and arg(m) = 120°, and |v| = 2 and arg(v) = 60°, write m and v in polar form and hence write 2m × 3v in polar form.`,
+  s: ["m = 4(cos 120° + i sin 120°) and v = 2(cos 60° + i sin 60°)", "2m has modulus 8 and argument 120°; 3v has modulus 6 and argument 60°", "Multiply the moduli: 8 × 6 = 48. Add the arguments: 120° + 60° = 180°"],
+  a: `m = 4(cos 120° + i sin 120°), v = 2(cos 60° + i sin 60°); 2m × 3v = 48(cos 180° + i sin 180°)` },
+{ t: "polarmd", q: `Given m = 4(cos 120° + i sin 120°) and v = 2(cos 60° + i sin 60°), find ${F("m²", "v²")} × (2 + 3i) in the form a + bi.`,
+  s: ["m² = 16(cos 240° + i sin 240°) and v² = 4(cos 120° + i sin 120°)", "m²/v² = 4(cos 120° + i sin 120°) = −2 + 2√3 i", "(−2 + 2√3 i)(2 + 3i) = −4 − 6i + 4√3 i + 6√3 i²"],
+  a: `(−4 − 6${SQ(3)}) + (4${SQ(3)} − 6)i` },
+{ t: "polarmd", q: `Given z₁ = 3(cos 20° + i sin 20°) and z₂ = 2(cos 40° + i sin 40°), find z₁z₂ in polar form and in the form a + bi.`,
+  s: ["Multiply the moduli: 3 × 2 = 6", "Add the arguments: 20° + 40° = 60°", `6(cos 60° + i sin 60°) = 3 + 3${SQ(3)}i`],
+  a: `6(cos 60° + i sin 60°) = 3 + 3${SQ(3)}i` },
+{ t: "polarmd", q: `Find 12(cos 150° + i sin 150°) ÷ 3(cos 30° + i sin 30°) and write the answer in the form a + bi.`,
+  s: ["Divide the moduli: 12 ÷ 3 = 4", "Subtract the arguments: 150° − 30° = 120°", `4(cos 120° + i sin 120°) = 4(−${F(1, 2)} + ${F(SQ(3), 2)}i)`],
+  a: `−2 + 2${SQ(3)}i` },
+{ t: "polarmd", q: `Write 1 + i and √3 + i in polar form and hence find their product in polar form.`,
+  s: [`1 + i = ${SQ(2)}(cos 45° + i sin 45°)`, "√3 + i = 2(cos 30° + i sin 30°)", `Moduli: ${SQ(2)} × 2 = 2${SQ(2)}. Arguments: 45° + 30° = 75°`],
+  a: `2${SQ(2)}(cos 75° + i sin 75°)` },
+
+/* De Moivre's theorem: powers */
+{ t: "demoivre", q: `Find the value of (3 + 3√3 i)¹⁰ in the form a + bi, where a, b ∈ ℝ.`,
+  s: [`|z| = √(9 + 27) = 6 and arg(z) = tan⁻¹(√3) = 60°`, "z¹⁰ = 6¹⁰(cos 600° + i sin 600°)", `600° = 240° (mod 360°): cos 240° = −${F(1, 2)} and sin 240° = −${F(SQ(3), 2)}`, "6¹⁰ = 60 466 176"],
+  a: `−30 233 088 − 30 233 088${SQ(3)}i` },
+{ t: "demoivre", q: `Use De Moivre’s theorem to write (3 − 3i)⁶ in the form p + qi, where p, q ∈ ℝ.`,
+  s: [`|z| = 3${SQ(2)} and arg(z) = −45°`, `(3${SQ(2)})⁶ = 729 × 8 = 5832`, "Angle: 6 × (−45°) = −270°, so cos(−270°) = 0 and sin(−270°) = 1"],
+  a: "5832i" },
+{ t: "demoivre", q: `Given z₁ = 2(cos 40° + i sin 40°), find z₁³ and leave your answer in rectangular form.`,
+  s: ["z₁³ = 2³(cos 120° + i sin 120°)", `cos 120° = −${F(1, 2)} and sin 120° = ${F(SQ(3), 2)}`, "8 × each"],
+  a: `−4 + 4${SQ(3)}i` },
+{ t: "demoivre", q: `Express 4 − 4i in polar form. Hence find the value of ${F(1, "(4 − 4i)³")}.`,
+  s: [`4 − 4i = 4${SQ(2)}(cos 315° + i sin 315°)`, `(4 − 4i)³ = (4${SQ(2)})³(cos 945° + i sin 945°) = 128${SQ(2)}(cos 225° + i sin 225°)`, `Reciprocal: ${F(1, "128" + SQ(2))}(cos(−225°) + i sin(−225°)) = ${F(1, "128" + SQ(2))}(cos 135° + i sin 135°)`],
+  a: `${F(1, "128" + SQ(2))}(cos 135° + i sin 135°) = −${F(1, 256)} + ${F(1, 256)}i` },
+{ t: "demoivre", q: `Use De Moivre’s theorem to write (√3 + i)⁶ in the form a + bi.`,
+  s: ["√3 + i = 2(cos 30° + i sin 30°)", "(√3 + i)⁶ = 2⁶(cos 180° + i sin 180°)", "64(−1 + 0i)"],
+  a: "−64" },
+
+/* Roots of complex numbers */
+{ t: "nthroots", q: `Given w = 4 + 4√3 i, find all solutions to z⁴ = w and leave each answer in rectangular form (to two decimal places).`,
+  s: [`|w| = 8 and arg(w) = 60°, so z⁴ = 8(cos 60° + i sin 60°)`, "First root: 8^(1/4)(cos 15° + i sin 15°) with 8^(1/4) ≈ 1.68", "The roots are 360° ÷ 4 = 90° apart: 15°, 105°, 195°, 285°"],
+  a: "1.62 + 0.44i, −0.44 + 1.62i, −1.62 − 0.44i, 0.44 − 1.62i" },
+{ t: "nthroots", q: `Use De Moivre’s theorem to find the three roots of z³ = −8. Give each answer in the form a + bi, where a, b ∈ ℝ.`,
+  s: ["−8 = 8(cos 180° + i sin 180°), so |z| = 2 and the first argument is 60°", "The roots are 360° ÷ 3 = 120° apart: 60°, 180°, 300°", `2(cos 60° + i sin 60°) = 1 + ${SQ(3)}i; 2(cos 180° + i sin 180°) = −2; 2(cos 300° + i sin 300°) = 1 − ${SQ(3)}i`],
+  a: `1 + ${SQ(3)}i, −2, 1 − ${SQ(3)}i` },
+{ t: "nthroots", q: `Use De Moivre’s theorem to find the values of w for which w² = −1 + √3 i. Give each value in the form a + bi, where a, b ∈ ℝ.`,
+  s: [`|−1 + ${SQ(3)}i| = 2 and the argument is 120°`, `First root: ${SQ(2)}(cos 60° + i sin 60°), and the second is 180° further round: ${SQ(2)}(cos 240° + i sin 240°)`],
+  a: `${F(SQ(2), 2)} + ${F(SQ(6), 2)}i and −${F(SQ(2), 2)} − ${F(SQ(6), 2)}i` },
+{ t: "nthroots", q: `Express z = 1 in general polar form and hence find the cube roots of unity, that is, the values of z for which z³ = 1.`,
+  s: ["1 = cos(0° + 360°k) + i sin(0° + 360°k)", "z = cos(120°k) + i sin(120°k) for k = 0, 1, 2", `The arguments are 0°, 120° and 240°`],
+  a: `z = 1, −${F(1, 2)} + ${F(SQ(3), 2)}i, −${F(1, 2)} − ${F(SQ(3), 2)}i` },
+{ t: "nthroots", q: `Find the four fourth roots of 16 + 32i, with each answer in rectangular form (to two decimal places).`,
+  s: [`|16 + 32i| = 16${SQ(5)} and arg = tan⁻¹(2) ≈ 63.4°`, `First root: |z| = (16${SQ(5)})^(1/4) ≈ 2.36, arg = 63.4° ÷ 4 ≈ 15.85°`, "Add 90° each time: 15.85°, 105.85°, 195.85°, 285.85°"],
+  a: "2.35 + 0.67i, −0.67 + 2.35i, −2.35 − 0.67i, 0.67 − 2.35i" },
+{ t: "nthroots", q: `Find the cube roots of 27i, with each answer in the form a + bi.`,
+  s: ["27i = 27(cos 90° + i sin 90°), so |z| = 3 and the first argument is 30°", "The roots are 120° apart: 30°, 150°, 270°"],
+  a: `${F("3" + SQ(3), 2)} + ${F(3, 2)}i, −${F("3" + SQ(3), 2)} + ${F(3, 2)}i, −3i` },
+
+/* Simplifying (cos θ − i sin θ)^n */
+{ t: "conjid", q: `Simplify (cos(2π/7) − i sin(2π/7))⁷ and write your answer in the form a + bi, where a, b ∈ ℝ.`,
+  s: ["cos(2π/7) − i sin(2π/7) = cos(−2π/7) + i sin(−2π/7)", "Seventh power: cos(−2π) + i sin(−2π)"],
+  a: "1 + 0i" },
+{ t: "conjid", q: `Given z₂ = 4(cos 300° − i sin 300°), find z₂³ and leave your answer in rectangular form.`,
+  s: ["z₂ = 4(cos(−300°) + i sin(−300°))", "z₂³ = 64(cos(−900°) + i sin(−900°))", "−900° ≡ 180°, so cos = −1 and sin = 0"],
+  a: "−64" },
+{ t: "conjid", q: `Simplify (cos 20° − i sin 20°)⁹.`,
+  s: ["Rewrite as (cos(−20°) + i sin(−20°))⁹", "= cos(−180°) + i sin(−180°)"],
+  a: "−1" },
+{ t: "conjid", q: `Write (cos(π/6) − i sin(π/6))⁴ in the form a + bi.`,
+  s: ["= (cos(−π/6) + i sin(−π/6))⁴ = cos(−2π/3) + i sin(−2π/3)", `cos(−2π/3) = −${F(1, 2)} and sin(−2π/3) = −${F(SQ(3), 2)}`],
+  a: `−${F(1, 2)} − ${F(SQ(3), 2)}i` },
+{ t: "conjid", q: `Simplify (cos θ + i sin θ)⁵ (cos θ − i sin θ)².`,
+  s: ["(cos θ − i sin θ)² = cos(−2θ) + i sin(−2θ)", "(cos θ + i sin θ)⁵ = cos 5θ + i sin 5θ", "Multiply: add the arguments, 5θ + (−2θ) = 3θ"],
+  a: "cos 3θ + i sin 3θ" },
+
+/* Proving trig identities */
+{ t: "trigid", q: `Use De Moivre’s theorem to express cos 4θ in terms of cos θ.`,
+  s: ["(cos θ + i sin θ)⁴ = cos 4θ + i sin 4θ", "Expand with the binomial theorem and take real parts: cos 4θ = cos⁴θ − 6cos²θ sin²θ + sin⁴θ", "Replace sin²θ by 1 − cos²θ: cos⁴θ − 6cos²θ(1 − cos²θ) + (1 − cos²θ)²", "= cos⁴θ − 6cos²θ + 6cos⁴θ + 1 − 2cos²θ + cos⁴θ"],
+  a: "cos 4θ = 8cos⁴θ − 8cos²θ + 1" },
+{ t: "trigid", q: `Use De Moivre’s theorem to show that cos 3θ = 4cos³θ − 3cos θ.`,
+  s: ["(cos θ + i sin θ)³ = cos 3θ + i sin 3θ", "Real part of the expansion: cos 3θ = cos³θ − 3cos θ sin²θ", "Replace sin²θ by 1 − cos²θ: cos³θ − 3cos θ + 3cos³θ"],
+  a: "cos 3θ = 4cos³θ − 3cos θ" },
+{ t: "trigid", q: `Use De Moivre’s theorem to show that sin 4θ = 4 sin θ cos θ (2cos²θ − 1).`,
+  s: ["Imaginary part of (cos θ + i sin θ)⁴: sin 4θ = 4cos³θ sin θ − 4cos θ sin³θ", "Factor: 4 sin θ cos θ (cos²θ − sin²θ)", "cos²θ − sin²θ = cos²θ − (1 − cos²θ) = 2cos²θ − 1"],
+  a: "sin 4θ = 4 sin θ cos θ (2cos²θ − 1)" },
+{ t: "trigid", q: `Use De Moivre’s theorem to show that cos 5θ = 16cos⁵θ − 20cos³θ + 5cos θ.`,
+  s: ["Real part of (cos θ + i sin θ)⁵: cos 5θ = cos⁵θ − 10cos³θ sin²θ + 5cos θ sin⁴θ", "Replace sin²θ by 1 − cos²θ: cos⁵θ − 10cos³θ(1 − cos²θ) + 5cos θ(1 − cos²θ)²", "= cos⁵θ − 10cos³θ + 10cos⁵θ + 5cos θ − 10cos³θ + 5cos⁵θ"],
+  a: "cos 5θ = 16cos⁵θ − 20cos³θ + 5cos θ" },
+{ t: "trigid", q: `Hence, or otherwise, express cos³θ in terms of cos 3θ and cos θ, using cos 3θ = 4cos³θ − 3cos θ.`,
+  s: ["Rearrange: 4cos³θ = cos 3θ + 3cos θ", "Divide by 4"],
+  a: `cos³θ = ${F(1, 4)}cos 3θ + ${F(3, 4)}cos θ` },
+
+/* Constructing line segments */
+{ t: "cxconstr", q: `Construct a line segment of length √3. Hence or otherwise construct √27.`,
+  s: [`√3: draw a right-angled triangle with legs 1 and √2 (hypotenuse √(1 + 2) = √3). √2 comes first from legs 1 and 1`, "√27 = 3√3, so mark off the √3 segment three times along a line"],
+  a: "√3 is the hypotenuse of a triangle with legs 1 and √2; √27 = 3√3 is three copies of that segment end to end" },
+{ t: "cxconstr", q: `Construct a line segment of length √15.`,
+  s: ["15 = 13 + 2, so use legs √13 and √2", "√13: right-angled triangle with legs 3 and 2", "√2: right-angled triangle with legs 1 and 1", "Hypotenuse of the triangle with legs √13 and √2 is √15"],
+  a: "Build √13 (legs 3 and 2) and √2 (legs 1 and 1); the hypotenuse of the triangle with legs √13 and √2 has length √15" },
+{ t: "cxconstr", q: `Construct a line segment of length 2√3.`,
+  s: ["Construct √3 first: legs 1 and √2 give √3, and √2 comes from legs 1 and 1", "2√3 is two copies of √3: use a compass to mark it off twice along a line"],
+  a: "Construct √3, then mark it off twice end to end with a compass" },
+{ t: "cxconstr", q: `Construct a line segment of length √19.`,
+  s: ["19 = 4² + (√3)², so use legs 4 and √3", "Construct √3 first (legs 1 and √2, where √2 comes from legs 1 and 1)", "The hypotenuse of the triangle with legs 4 and √3 is √19"],
+  a: "Right-angled triangle with legs 4 and √3; the hypotenuse has length √19" },
+{ t: "cxconstr", q: `Construct a line segment of length √7.`,
+  s: ["7 = 2² + (√3)², so use legs 2 and √3", "Construct √3 first (legs 1 and √2)", "The hypotenuse of the triangle with legs 2 and √3 is √7"],
+  a: "Right-angled triangle with legs 2 and √3; the hypotenuse has length √7" },
+/* ===== Fill-out: Algebra I ===== */
+/* Binomial expansions */
+{ t: "binom", q: `Find the fourth term in the expansion of (4r − 3)⁶.`,
+  s: ["The fourth term has r = 3: <sup>6</sup>C<sub>3</sub>(4r)³(−3)³", "= 20 × 64r³ × (−27)"], a: "−34 560r³" },
+{ t: "binom", q: `Find the 6th term in the expansion of (2x − ${F("y", 2)})¹².`,
+  s: ["Sixth term: r = 5, so T = <sup>12</sup>C<sub>5</sub>(2x)⁷(−y/2)⁵", "<sup>12</sup>C<sub>5</sub> = 792, (2x)⁷ = 128x⁷ and (−y/2)⁵ = −y⁵/32", "792 × 128 ÷ 32 = 3168"], a: "−3168x⁷y⁵" },
+{ t: "binom", q: `Find the coefficient of x³ in the expansion of (2x − 1)⁶.`,
+  s: ["The x³ term has three factors of 2x: <sup>6</sup>C<sub>3</sub>(2x)³(−1)³", "= 20 × 8x³ × (−1)"], a: "−160" },
+{ t: "binom", q: `Find the middle term in the expansion of (x + 2)⁸.`,
+  s: ["There are 9 terms, so the middle one is the fifth (r = 4)", "<sup>8</sup>C<sub>4</sub>x⁴(2)⁴ = 70 × 16x⁴"], a: "1120x⁴" },
+{ t: "binom", q: `The coefficient of x² in the expansion of (1 + ax)⁶ is 135. Find the possible values of a.`,
+  s: ["The x² term is <sup>6</sup>C<sub>2</sub>(ax)² = 15a²x²", "15a² = 135, so a² = 9"], a: "a = 3 or a = −3" },
+
+/* Algebraic identities */
+{ t: "ident", q: `Given that x² + bx + c is a factor of 3x³ − kx² + tx − 7, prove that c = ${F(7, "3b + k")} and b = ${F("3c² − tc", 7)}.`,
+  s: ["The other factor is linear with leading term 3x: 3x³ − kx² + tx − 7 ≡ (x² + bx + c)(3x + d)", "Expand: 3x³ + (3b + d)x² + (bd + 3c)x + cd", "Equate coefficients: 3b + d = −k, bd + 3c = t and cd = −7", "From the first, d = −(3b + k), so cd = −7 gives c = 7/(3b + k)", "From cd = −7, d = −7/c. Substitute into bd + 3c = t: −7b/c + 3c = t, so b = (3c² − tc)/7"],
+  a: `c = ${F(7, "3b + k")} and b = ${F("3c² − tc", 7)}`, also: ["factor"] },
+{ t: "ident", q: `Find a, b and c if x² + 4x − 5 ≡ a(x + 1)² + b(x + 1) + c for all values of x.`,
+  s: ["Expand the right side: ax² + (2a + b)x + (a + b + c)", "x²: a = 1. x: 2a + b = 4, so b = 2", "Constant: a + b + c = −5, so c = −8"], a: "a = 1, b = 2, c = −8" },
+{ t: "ident", q: `Find a and b if 3x² − 12x + 7 ≡ 3(x − a)² + b for all values of x.`,
+  s: ["Expand: 3x² − 6ax + 3a² + b", "x: −6a = −12, so a = 2", "Constant: 3a² + b = 7, so 12 + b = 7"], a: "a = 2, b = −5", also: ["cts"] },
+{ t: "ident", q: `Find a and b such that x³ − 6x² + 11x − 6 ≡ (x − 1)(x² + ax + b).`,
+  s: ["Expand: x³ + (a − 1)x² + (b − a)x − b", "x²: a − 1 = −6, so a = −5. Constant: −b = −6, so b = 6", "Check the x term: b − a = 11 ✓"], a: "a = −5, b = 6" },
+{ t: "ident", q: `Show that (2n + 1)² − (2n − 1)² ≡ 8n for all values of n.`,
+  s: ["(2n + 1)² = 4n² + 4n + 1", "(2n − 1)² = 4n² − 4n + 1", "Subtract: 8n"], a: "(2n + 1)² − (2n − 1)² ≡ 8n" },
+
+/* Algebraic fractions */
+{ t: "frac", q: `Simplify fully ${F("8x³ − 27", "2(x + 2)² − (2x − 1 − 2x²)")}.`,
+  s: ["Denominator: 2x² + 8x + 8 − 2x + 1 + 2x² = 4x² + 6x + 9", "Numerator is a difference of cubes: 8x³ − 27 = (2x − 3)(4x² + 6x + 9)", "Cancel 4x² + 6x + 9"], a: "2x − 3", also: ["cubes"] },
+{ t: "frac", q: `Simplify fully (${F("a", "b")} − ${F("b", "a")}) ÷ (1 + ${F("b", "a")}).`,
+  s: ["Top: a/b − b/a = (a² − b²)/(ab)", "Bottom: 1 + b/a = (a + b)/a", "Divide: (a² − b²)/(ab) × a/(a + b) = (a − b)(a + b)/(b(a + b))"], a: F("a − b", "b") },
+{ t: "frac", q: `Solve ${F(4, "m − 2")} + ${F("2m", "m − 3")} = 2.`,
+  s: ["Multiply through by (m − 2)(m − 3)", "4(m − 3) + 2m(m − 2) = 2(m − 2)(m − 3)", "2m² − 12 = 2m² − 10m + 12", "10m = 24"], a: `m = ${F(12, 5)}` },
+{ t: "frac", q: `Given ${F("3x + 1", "(x − 4)(x − 5)")} ≡ ${F("A", "x − 4")} + ${F("B", "x − 5")} for all x ∈ ℝ, find A and B.`,
+  s: ["3x + 1 ≡ A(x − 5) + B(x − 4)", "x = 4: 13 = −A, so A = −13", "x = 5: 16 = B"], a: "A = −13, B = 16", also: ["ident"] },
+{ t: "frac", q: `Simplify fully (${F("x + 3", "2x")} − ${F("x + 6", "x²")}) ÷ (${F("x", 9)} − ${F(1, "x")}).`,
+  s: ["Top: [x(x + 3) − 2(x + 6)]/(2x²) = (x² + x − 12)/(2x²) = (x + 4)(x − 3)/(2x²)", "Bottom: (x² − 9)/(9x) = (x − 3)(x + 3)/(9x)", "Divide, then cancel (x − 3) and x: (x + 4)/(2x) × 9/(x + 3)"], a: F("9(x + 4)", "2x(x + 3)") },
+{ t: "frac", q: `Simplify fully ${F("2(3x − 4)² − 32", "27x³ − 512")}.`,
+  s: ["Top: 2[(3x − 4)² − 16] = 2(3x − 8)(3x) = 6x(3x − 8)", "Bottom: (3x)³ − 8³ = (3x − 8)(9x² + 24x + 64)", "Cancel (3x − 8)"], a: F("6x", "9x² + 24x + 64"), also: ["cubes"] },
+{ t: "frac", q: `Express ${F(2, "x + 1")} + ${F(3, "x − 2")} as a single fraction.`,
+  s: ["Common denominator (x + 1)(x − 2)", "2(x − 2) + 3(x + 1) = 5x − 1"], a: F("5x − 1", "(x + 1)(x − 2)") },
+{ t: "frac", q: `Simplify ${F("x² − 9", "x² + x − 12")} ÷ ${F("x + 3", "x − 4")}.`,
+  s: ["Factorise the first fraction: (x − 3)(x + 3)/((x + 4)(x − 3)) = (x + 3)/(x + 4)", "Invert the second fraction and multiply: (x + 3)/(x + 4) × (x − 4)/(x + 3)"], a: F("x − 4", "x + 4") },
+
+/* Triple simultaneous equations */
+{ t: "triple", q: `Find the point of intersection of the planes x − 3y + 2z = 13, 2x + y + z = 3 and 5x − 2y + z = 12.`,
+  s: ["Label them ①, ② and ③", "② − ③ eliminates z: −3x + 3y = −9, so y = x − 3", "2 × ② − ① eliminates z: 3x + 5y = −7. Substitute y = x − 3: 8x − 15 = −7, so x = 1 and y = −2", "From ②: 2 − 2 + z = 3, so z = 3"], a: "(1, −2, 3)" },
+{ t: "triple", q: `Solve for a, b, c ∈ ℤ: a + 2b = 143, b + 3c = −74 and 4a + 5c = 4.`,
+  s: ["From the first, a = 143 − 2b. Substitute into the third: 572 − 8b + 5c = 4, so 8b − 5c = 568", "Multiply b + 3c = −74 by 5 and 8b − 5c = 568 by 3: 5b + 15c = −370 and 24b − 15c = 1704", "Add: 29b = 1334, so b = 46", "a = 143 − 92 = 51 and 46 + 3c = −74 gives c = −40"], a: "a = 51, b = 46, c = −40" },
+{ t: "triple", q: `Solve x + y = 5, y + z = 7 and x + z = 8.`,
+  s: ["Add all three: 2(x + y + z) = 20, so x + y + z = 10", "z = 10 − 5 = 5, x = 10 − 7 = 3 and y = 10 − 8 = 2"], a: "x = 3, y = 2, z = 5" },
+{ t: "triple", q: `A quadratic y = ax² + bx + c passes through (1, 2), (2, 3) and (−1, 6). Find a, b and c.`,
+  s: ["Substitute each point: a + b + c = 2, 4a + 2b + c = 3 and a − b + c = 6", "First minus third: 2b = −4, so b = −2", "Then a + c = 4 and 4a + c = 7, so 3a = 3, a = 1 and c = 3"], a: "y = x² − 2x + 3", also: ["graphs"] },
+{ t: "triple", q: `The sum of three numbers is 20. The second is twice the first, and the third is 4 less than the sum of the first two. Find the numbers.`,
+  s: ["Let the numbers be x, y and z: x + y + z = 20, y = 2x and z = x + y − 4", "z = 3x − 4, so x + 2x + 3x − 4 = 20 and x = 4"], a: "4, 8 and 8" },
+
+/* Factorisation and cubes */
+{ t: "cubes", q: `Use the quadratic formula to factorise 2x² + 7√5x − 20. Write both factors in the form (ax ± √b), where a, b ∈ ℤ.`,
+  s: [`x = (−7√5 ± √(245 + 160))/4 = (−7√5 ± 9√5)/4`, `x = ${F(SQ(5), 2)} or x = −4${SQ(5)}`, `2x² + 7√5x − 20 = 2(x − ${F(SQ(5), 2)})(x + 4${SQ(5)}) = (2x − ${SQ(5)})(x + 4${SQ(5)})`, `4√5 = √80`],
+  a: `(2x − ${SQ(5)})(x + ${SQ(80)})`, also: ["ident"] },
+{ t: "cubes", q: `Factorise 64a³ − 27b³.`,
+  s: ["64a³ = (4a)³ and 27b³ = (3b)³", "p³ − q³ = (p − q)(p² + pq + q²) with p = 4a and q = 3b"], a: "(4a − 3b)(16a² + 12ab + 9b²)" },
+{ t: "cubes", q: `Factorise fully 2x⁴ + 250x.`,
+  s: ["Take out the HCF 2x: 2x(x³ + 125)", "x³ + 125 = (x + 5)(x² − 5x + 25)"], a: "2x(x + 5)(x² − 5x + 25)" },
+{ t: "cubes", q: `Given a − b = 4 and ab = 6, find a³ − b³ without finding a or b.`,
+  s: ["(a − b)³ = a³ − b³ − 3ab(a − b)", "a³ − b³ = (a − b)³ + 3ab(a − b) = 64 + 3(6)(4)"], a: "136", also: ["ident"] },
+{ t: "cubes", q: `Factorise (x − 2)³ + 27.`,
+  s: ["Sum of cubes with p = x − 2 and q = 3: (p + q)(p² − pq + q²)", "(x + 1)((x − 2)² − 3(x − 2) + 9)", "(x − 2)² − 3(x − 2) + 9 = x² − 7x + 19"], a: "(x + 1)(x² − 7x + 19)" },
+
+/* Algebraic division */
+{ t: "divide", q: `Divide 26x⁴ + 12x³ − 84x² − 4x + 8 by 2x + 4.`,
+  s: ["13x³ × (2x + 4) = 26x⁴ + 52x³, leaving −40x³ − 84x² − 4x + 8", "−20x² × (2x + 4) = −40x³ − 80x², leaving −4x² − 4x + 8", "−2x × (2x + 4) = −4x² − 8x, leaving 4x + 8", "2 × (2x + 4) = 4x + 8, leaving 0"], a: "13x³ − 20x² − 2x + 2 (remainder 0)" },
+{ t: "divide", q: `The quadratic px² − 56x + 49 is a perfect square. Find p. Then use algebraic division to find the linear factor that goes with it in the cubic 16x³ − 8x² − 119x + 147.`,
+  s: ["Perfect square means the discriminant is zero: 3136 − 196p = 0, so p = 16 and 16x² − 56x + 49 = (4x − 7)²", "x × (16x² − 56x + 49) = 16x³ − 56x² + 49x, leaving 48x² − 168x + 147", "3 × (16x² − 56x + 49) = 48x² − 168x + 147, leaving 0"], a: "p = 16 and the linear factor is x + 3", also: ["disc"] },
+{ t: "divide", q: `Divide 2x³ − 5x² − 4x + 3 by x − 3.`,
+  s: ["2x² × (x − 3) = 2x³ − 6x², leaving x² − 4x + 3", "x × (x − 3) = x² − 3x, leaving −x + 3", "−1 × (x − 3) = −x + 3, leaving 0"], a: "2x² + x − 1 (remainder 0)" },
+{ t: "divide", q: `Divide x³ + 2x² − 5x − 6 by x + 3.`,
+  s: ["x² × (x + 3) = x³ + 3x², leaving −x² − 5x − 6", "−x × (x + 3) = −x² − 3x, leaving −2x − 6", "−2 × (x + 3) = −2x − 6, leaving 0"], a: "x² − x − 2 (remainder 0)" },
+{ t: "divide", q: `Find the quotient and remainder when 3x³ − 4x² + 2x − 7 is divided by x − 2.`,
+  s: ["3x² × (x − 2) = 3x³ − 6x², leaving 2x² + 2x − 7", "2x × (x − 2) = 2x² − 4x, leaving 6x − 7", "6 × (x − 2) = 6x − 12, leaving 5"], a: "Quotient 3x² + 2x + 6, remainder 5" },
+{ t: "divide", q: `Divide 4x³ − 13x + 6 by 2x − 3 and hence factorise 4x³ − 13x + 6 fully.`,
+  s: ["Write the missing term in: 4x³ + 0x² − 13x + 6", "2x² × (2x − 3) = 4x³ − 6x², leaving 6x² − 13x + 6", "3x × (2x − 3) = 6x² − 9x, leaving −4x + 6", "−2 × (2x − 3) = −4x + 6, leaving 0", "2x² + 3x − 2 = (2x − 1)(x + 2)"], a: "Quotient 2x² + 3x − 2, so 4x³ − 13x + 6 = (2x − 3)(2x − 1)(x + 2)", also: ["factor"] },
+{ t: "divide", q: `Divide x⁴ − 16 by x − 2.`,
+  s: ["Write it as x⁴ + 0x³ + 0x² + 0x − 16", "x³ × (x − 2) = x⁴ − 2x³, leaving 2x³", "2x² × (x − 2) = 2x³ − 4x², leaving 4x²", "4x × (x − 2) = 4x² − 8x, leaving 8x − 16", "8 × (x − 2) = 8x − 16, leaving 0"], a: "x³ + 2x² + 4x + 8 (remainder 0)" },
+{ t: "divide", q: `Find the quotient and remainder when 2x³ + x² − 8x + 3 is divided by x − 1.`,
+  s: ["2x² × (x − 1) = 2x³ − 2x², leaving 3x² − 8x + 3", "3x × (x − 1) = 3x² − 3x, leaving −5x + 3", "−5 × (x − 1) = −5x + 5, leaving −2"], a: "Quotient 2x² + 3x − 5, remainder −2" },
+
+/* ===== Fill-out: Algebra II ===== */
+/* Surd equations */
+{ t: "surd", q: `Solve 4 + 2${SQ("x + 3")} = x + 2. Leave your answer in the form a + b${SQ("c")} and check it.`,
+  s: ["Isolate the root: 2√(x + 3) = x − 2", "Square both sides: 4(x + 3) = x² − 4x + 4, so x² − 8x − 8 = 0", `x = (8 ± √96)/2 = 4 ± 2${SQ(6)}`, `Check: the right side x − 2 must be positive. 4 + 2√6 works, but 4 − 2√6 ≈ −0.9 makes x − 2 negative, so it is rejected`], a: `x = 4 + 2${SQ(6)} only` },
+{ t: "surd", q: `Solve ${SQ("x − 2")} + 2 = ${SQ("3x − 2")}.`,
+  s: ["Square both sides: x − 2 + 4√(x − 2) + 4 = 3x − 2", "Isolate the root: 4√(x − 2) = 2x − 4", "Square again: 16(x − 2) = 4x² − 16x + 16, so x² − 8x + 12 = 0", "(x − 2)(x − 6) = 0. Check: x = 2 gives 0 + 2 = 2 ✓ and x = 6 gives 2 + 2 = 4 ✓"], a: "x = 2 or x = 6" },
+{ t: "surd", q: `Solve ${SQ("x + 7")} + ${SQ("x")} = 7 and check your solution.`,
+  s: ["Isolate one root: √(x + 7) = 7 − √x", "Square: x + 7 = 49 − 14√x + x", "14√x = 42, so √x = 3", "x = 9. Check: √16 + √9 = 4 + 3 = 7 ✓"], a: "x = 9" },
+{ t: "surd", q: `Solve ${SQ("x + 5")} + 1 = x.`,
+  s: ["Isolate the root: √(x + 5) = x − 1", "Square: x + 5 = x² − 2x + 1, so x² − 3x − 4 = 0", "(x − 4)(x + 1) = 0", "Check: x = 4 gives 3 + 1 = 4 ✓. x = −1 gives 2 + 1 = 3 ≠ −1, so it is rejected"], a: "x = 4" },
+
+/* Completing the square */
+{ t: "cts", q: `Write y = 2x² + 5x − 9 in the form y = a(x + b)² + c, where a, b, c ∈ ℝ. Hence find the minimum point of the curve.`,
+  s: [`Take out the 2: y = 2(x² + ${F(5, 2)}x − ${F(9, 2)})`, `Half of 5/2 is 5/4, and (x + 5/4)² = x² + 5x/2 + 25/16`, `y = 2[(x + 5/4)² − 25/16 − 9/2] = 2[(x + 5/4)² − 97/16]`], a: `y = 2(x + ${F(5, 4)})² − ${F(97, 8)}; minimum point (−${F(5, 4)}, −${F(97, 8)})` },
+{ t: "cts", q: `Write f(x) = −2x² + 2x + 5 in the form f(x) = k(x + q)² + t, where k, q, t ∈ ℝ, and hence write down the turning point.`,
+  s: ["Take out −2: f(x) = −2(x² − x − 5/2)", "(x − 1/2)² = x² − x + 1/4, so x² − x − 5/2 = (x − 1/2)² − 11/4", "f(x) = −2[(x − 1/2)² − 11/4] = −2(x − 1/2)² + 11/2"], a: `f(x) = −2(x − ${F(1, 2)})² + ${F(11, 2)}; turning point (${F(1, 2)}, ${F(11, 2)}), a maximum` },
+{ t: "cts", q: `Write each of the following in the form (x − p)² + q = 0: (i) x² + 4x − 6 = 0, (ii) x² + 9x + 4 = 0, (iii) x² − 7x − 3 = 0.`,
+  s: ["Add and subtract the square of half the x coefficient in each", "(i) (x + 2)² − 4 − 6", "(ii) (x + 9/2)² − 81/4 + 4", "(iii) (x − 7/2)² − 49/4 − 3"], a: `(i) (x + 2)² − 10 = 0; (ii) (x + ${F(9, 2)})² − ${F(65, 4)} = 0; (iii) (x − ${F(7, 2)})² − ${F(61, 4)} = 0` },
+{ t: "cts", q: `Find the maximum value of 7 + 6x − x² and the value of x at which it occurs.`,
+  s: ["Rewrite as −x² + 6x + 7 = −(x² − 6x − 7)", "x² − 6x − 7 = (x − 3)² − 16", "So the expression equals −(x − 3)² + 16"], a: "Maximum value 16, at x = 3" },
+
+/* Factor theorem */
+{ t: "factor", q: `Given that x = 6 is a root of y = 6x³ − kx² + 31x − 6, find k and hence find the other two roots.`,
+  s: ["6(6)³ − k(6)² + 31(6) − 6 = 0, so 1476 = 36k and k = 41", "Divide 6x³ − 41x² + 31x − 6 by (x − 6): quotient 6x² − 5x + 1", "6x² − 5x + 1 = (3x − 1)(2x − 1)"], a: `k = 41; the other roots are x = ${F(1, 3)} and x = ${F(1, 2)}` },
+{ t: "factor", q: `If (x + 2) is a factor of x³ + ax² − x − 2, find a and hence find the other two factors.`,
+  s: ["f(−2) = 0: −8 + 4a + 2 − 2 = 0, so a = 2", "Divide x³ + 2x² − x − 2 by (x + 2): quotient x² − 1", "x² − 1 = (x − 1)(x + 1)"], a: "a = 2; the other factors are (x − 1) and (x + 1)" },
+{ t: "factor", q: `Solve the cubic equation 2x³ + 4x² − 6x − 12 = 0.`,
+  s: ["Try x = −2: 2(−8) + 4(4) + 12 − 12 = 0, so (x + 2) is a factor", "Divide: 2x³ + 4x² − 6x − 12 = (x + 2)(2x² − 6)", "2x² − 6 = 0 gives x² = 3"], a: `x = −2, x = ${SQ(3)} or x = −${SQ(3)}` },
+{ t: "factor", q: `When f(x) = x³ + kx² − 5x + 2 is divided by (x − 2) the remainder is 4. Find k.`,
+  s: ["The remainder is f(2)", "f(2) = 8 + 4k − 10 + 2 = 4k", "4k = 4"], a: "k = 1" },
+
+/* Non-linear simultaneous equations */
+{ t: "nonlin", q: `Find the points of intersection of y = 2x² + 3x − 7 and 6x − 2y + 2 = 0.`,
+  s: ["From the line: y = 3x + 1", "Substitute: 2x² + 3x − 7 = 3x + 1, so 2x² = 8 and x = ±2", "y = 3(2) + 1 = 7 and y = 3(−2) + 1 = −5"], a: "(2, 7) and (−2, −5)" },
+{ t: "nonlin", q: `Find the points of intersection of the line 4x − 2y = 5 and the circle x² + y² = ${F(25, 4)}.`,
+  s: ["From the line: y = 2x − 5/2", "x² + (2x − 5/2)² = 25/4, so 5x² − 10x + 25/4 = 25/4", "5x(x − 2) = 0, so x = 0 or x = 2", "y = −5/2 when x = 0 and y = 3/2 when x = 2"], a: `(0, −${F(5, 2)}) and (2, ${F(3, 2)})` },
+{ t: "nonlin", q: `Solve the pair of simultaneous equations x² + y² = 25 and x + y = 7.`,
+  s: ["From the line: y = 7 − x", "x² + (7 − x)² = 25, so 2x² − 14x + 24 = 0", "x² − 7x + 12 = 0, so (x − 3)(x − 4) = 0"], a: "(3, 4) and (4, 3)" },
+{ t: "nonlin", q: `Find the points where the curve y = x² − 4x + 1 meets the line y = x − 3.`,
+  s: ["Set equal: x² − 4x + 1 = x − 3", "x² − 5x + 4 = 0, so (x − 1)(x − 4) = 0", "y = −2 when x = 1 and y = 1 when x = 4"], a: "(1, −2) and (4, 1)" },
+
+/* Creating equations from graphs */
+{ t: "graphs", q: `The graph of y = ax³ + bx² + cx + d crosses the x-axis at x = 1, x = −2 and x = ${F(1, 2)}, and crosses the y-axis at (0, 6). Find a, b, c and d.`,
+  s: ["y = a(x − 1)(x + 2)(x − 1/2)", "At (0, 6): a(−1)(2)(−1/2) = 6, so a = 6", "6(x − 1)(x + 2)(x − 1/2) = 3(x − 1)(x + 2)(2x − 1)", "(x − 1)(x + 2) = x² + x − 2 and (x² + x − 2)(2x − 1) = 2x³ + x² − 5x + 2, then multiply by 3"], a: "y = 6x³ + 3x² − 15x + 6, so a = 6, b = 3, c = −15, d = 6", also: ["factor"] },
+{ t: "graphs", q: `A quadratic has its turning point at (−3, −1) and passes through (−2, −3). Write its equation in the form y = ax² + bx + c.`,
+  s: ["y = k(x + 3)² − 1", "At (−2, −3): −3 = k(1) − 1, so k = −2", "y = −2(x² + 6x + 9) − 1"], a: "y = −2x² − 12x − 19", also: ["cts"] },
+{ t: "graphs", q: `A cubic crosses the x-axis at x = −1, x = 3 and x = 7 and passes through (0, 7). Write its equation in the form y = ax³ + bx² + cx + d.`,
+  s: ["y = a(x + 1)(x − 3)(x − 7) = a(x³ − 9x² + 11x + 21)", "At (0, 7): 21a = 7, so a = 1/3"], a: `y = ${F(1, 3)}x³ − 3x² + ${F(11, 3)}x + 7` },
+{ t: "graphs", q: `A quadratic has a maximum point at (2, 4) and passes through (1, 1). Find its equation.`,
+  s: ["y = a(x − 2)² + 4", "At (1, 1): 1 = a(1) + 4, so a = −3"], a: "y = −3(x − 2)² + 4 = −3x² + 12x − 8" },
+
+/* Discriminant */
+{ t: "disc", q: `Find the values of a for which y = ax² + 6x + a has two equal roots.`,
+  s: ["Equal roots means b² − 4ac = 0", "36 − 4a² = 0, so a² = 9"], a: "a = 3 or a = −3" },
+{ t: "disc", q: `Prove that y = x² − 4x + 5 is positive for all values of x.`,
+  s: ["b² − 4ac = (−4)² − 4(1)(5) = −4 < 0, so there are no real roots and the curve never meets the x-axis", "The coefficient of x² is positive, so the curve opens upwards and lies above the x-axis"], a: "y > 0 for all x", also: ["cts"] },
+{ t: "disc", q: `Find the discriminant of each equation and state whether its roots are real and different, real and equal, or imaginary: (i) 2x² + x + 5 = 0, (ii) −2x² + 3x + 1 = 0, (iii) 3x² + 2x − 1 = 0.`,
+  s: ["Discriminant = b² − 4ac", "(i) 1 − 40 = −39", "(ii) 9 + 8 = 17", "(iii) 4 + 12 = 16"], a: "(i) −39: imaginary roots; (ii) 17: real and different; (iii) 16: real and different" },
+{ t: "disc", q: `Prove that y = −x² + 2x − 3 is negative for all values of x.`,
+  s: ["b² − 4ac = 4 − 12 = −8 < 0, so there are no real roots", "The coefficient of x² is negative, so the curve opens downwards and lies below the x-axis"], a: "y < 0 for all x", also: ["cts"] },
+
+/* Substitution method */
+{ t: "subst", q: `Find all real solutions of 2(x² − 1)² + 7(x² − 1) = 15.`,
+  s: ["Let u = x² − 1: 2u² + 7u − 15 = 0", "(2u − 3)(u + 5) = 0, so u = 3/2 or u = −5", "x² − 1 = 3/2 gives x² = 5/2; x² − 1 = −5 gives x² = −4, which has no real solution"], a: `x = ±${SQ("5/2")} = ±${F(SQ(10), 2)}` },
+{ t: "subst", q: `Find all real solutions of 2x⁴ − 8x² = 10.`,
+  s: ["Let u = x²: 2u² − 8u − 10 = 0, so u² − 4u − 5 = 0", "(u − 5)(u + 1) = 0, so u = 5 or u = −1", "x² = 5 gives x = ±√5; x² = −1 has no real solution"], a: `x = ${SQ(5)} or x = −${SQ(5)}` },
+{ t: "subst", q: `Solve (2t − ${F(5, "t")})² − 12(2t − ${F(5, "t")}) + 27 = 0.`,
+  s: ["Let u = 2t − 5/t: u² − 12u + 27 = 0, so (u − 3)(u − 9) = 0", "2t − 5/t = 3: 2t² − 3t − 5 = 0, so (2t − 5)(t + 1) = 0", "2t − 5/t = 9: 2t² − 9t − 5 = 0, so (2t + 1)(t − 5) = 0"], a: `t = ${F(5, 2)}, −1, −${F(1, 2)} or 5` },
+{ t: "subst", q: `Solve x − 5${SQ("x")} + 6 = 0.`,
+  s: ["Let u = √x: u² − 5u + 6 = 0", "(u − 2)(u − 3) = 0, so u = 2 or u = 3", "x = u²"], a: "x = 4 or x = 9", also: ["surd"] },
+
+/* ===== Fill-out: Trigonometry I ===== */
+/* Radians, arc length and sector area */
+{ t: "rad", q: `A sector has radius 5 cm and an angle of 2 radians. Find its area.`,
+  s: ["A = ½θr² = ½(2)(5)²"], a: "25 cm²" },
+{ t: "rad", q: `A sector has an angle of 220° and an area of 20 cm². Convert 220° to radians and hence find the arc length of the sector.`,
+  s: ["220° = 220π/180 = 11π/9 radians", "20 = ½(11π/9)r², so r² = 360/(11π) and r ≈ 3.2276 cm", "Arc length l = rθ = 3.2276 × 11π/9"], a: "≈ 12.4 cm" },
+{ t: "rad", q: `Three concentric arcs AB, CD and EF with centre O subtend the same angle θ at O and have radii 10 m, 12 m and 14 m. Arc CD is 5 m longer than arc AB. Find θ in radians and the length of arc EF.`,
+  s: ["Arc AB = 10θ and arc CD = 12θ", "12θ = 10θ + 5, so θ = 2.5", "Arc EF = 14θ = 14 × 2.5"], a: "θ = 2.5 radians; arc EF = 35 m" },
+{ t: "rad", q: `A sector of a circle with centre O and radius 4 cm has a reflex angle AOB, and the reflex sector has area ${F("32π", 3)} cm². Find the reflex angle in radians, ∠AOB in degrees, the length |AB| in the form a√b, and the area of triangle AOB to one decimal place.`,
+  s: ["½θ(4)² = 32π/3, so θ = 4π/3 (which is 240°)", "∠AOB = 360° − 240° = 120°", "Cosine rule: |AB|² = 4² + 4² − 2(4)(4)cos 120° = 48, so |AB| = 4√3", "Area = ½(4)(4) sin 120° = 8 sin 120°"], a: `Reflex angle ${F("4π", 3)}; ∠AOB = 120°; |AB| = 4${SQ(3)} cm; area ≈ 6.9 cm²`, also: ["rules"] },
+{ t: "rad", q: `A pendulum 80 cm long swings through an angle of 0.6 radians. Find the length of the arc traced by its tip and the area swept out.`,
+  s: ["Arc length l = rθ = 80(0.6)", "Area = ½r²θ = ½(80)²(0.6)"], a: "48 cm and 1920 cm²" },
+
+/* Right-angled triangles */
+{ t: "right", q: `In a right-angled triangle sin x = ${F(2, 3)} and the side adjacent to angle x is 12 cm. Find the length of the hypotenuse and write down the value of cos²x.`,
+  s: ["Opposite = 2k and hypotenuse = 3k, so adjacent = √(9 − 4)k = √5k", "cos x = √5/3, so cos²x = 5/9", "12 = √5k gives k = 12/√5, and the hypotenuse is 3k"], a: `Hypotenuse = ${F("36" + SQ(5), 5)} ≈ 16.1 cm; cos²x = ${F(5, 9)}` },
+{ t: "right", q: `Given cot A = 2, find the exact values of sin A and cos A, and find the angle A to the nearest minute.`,
+  s: ["cot A = 1/tan A = 2, so tan A = 1/2: take opposite 1 and adjacent 2", "Hypotenuse = √(1 + 4) = √5", "A = tan⁻¹(0.5) = 26.565° = 26°34′"], a: `sin A = ${F(1, SQ(5))}, cos A = ${F(2, SQ(5))}, A = 26°34′` },
+{ t: "right", q: `When David is x metres from a building, the angle of elevation of its top is 62°. When he walks 3 m further away it reduces to 32°. Find the height of the building, ignoring David's height, correct to two decimal places.`,
+  s: ["Let the height be h. tan 62° = h/x, so h = x tan 62°", "tan 32° = h/(x + 3), so h = (x + 3) tan 32°", "x tan 62° = (x + 3) tan 32°, so x(tan 62° − tan 32°) = 3 tan 32°", "x = 3 tan 32°/(tan 62° − tan 32°) ≈ 1.493 m", "h = 1.493 × tan 62° ≈ 2.81 m"], a: "≈ 2.81 m" },
+{ t: "right", q: `From the top of a 40 m lighthouse the angle of depression of a boat is 25°. How far is the boat from the foot of the lighthouse, to the nearest metre?`,
+  s: ["The angle of elevation of the top from the boat is also 25° (alternate angles)", "tan 25° = 40/d, so d = 40/tan 25°"], a: "≈ 86 m" },
+{ t: "right", q: `Without a calculator, find the exact value of sin 60° cos 30° − tan 45° sin 30°.`,
+  s: ["sin 60° = √3/2, cos 30° = √3/2, tan 45° = 1 and sin 30° = 1/2", "(√3/2)(√3/2) − (1)(1/2) = 3/4 − 1/2"], a: F(1, 4) },
+
+/* Solving trig equations */
+{ t: "solve", q: `Find the general solution of 2 + 2 sin x = 1.`,
+  s: ["sin x = −1/2, with reference angle 30°", "Sine is negative in the third and fourth quadrants: x = 210° and x = 330°"], a: "x = 210° + 360°n or x = 330° + 360°n, n ∈ ℤ" },
+{ t: "solve", q: `Find all solutions of 2 cos 3x = √3 on the domain 0° ≤ x < 240°.`,
+  s: ["cos 3x = √3/2, so 3x = 30° or 330° (plus multiples of 360°)", "x = 10° + 120°n or x = 110° + 120°n", "n = 0: 10°, 110°. n = 1: 130°, 230°. n = 2 gives 250° and 350°, outside the domain"], a: "x = 10°, 110°, 130°, 230°" },
+{ t: "solve", q: `Find the general solution of tan 4x = 1, and hence list all solutions in the domain 0° < x < 180°.`,
+  s: ["The period of tan is 180°: 4x = 45° + 180°n", "x = 11.25° + 45°n", "n = 0, 1, 2, 3 give 11.25°, 56.25°, 101.25°, 146.25°; n = 4 gives 191.25°, outside the domain"], a: "x = 11.25° + 45°n; solutions 11.25°, 56.25°, 101.25°, 146.25°" },
+{ t: "solve", q: `Find the general solution of 4 sin(${F("x", 2)}) = 2, and hence all solutions on the domain 0 ≤ x ≤ 5π.`,
+  s: ["sin(x/2) = 1/2, so x/2 = π/6 + 2πn or x/2 = 5π/6 + 2πn", "x = π/3 + 4πn or x = 5π/3 + 4πn", "n = 0: π/3 and 5π/3. n = 1: 13π/3 is inside the domain (it is less than 5π), but 17π/3 is outside"], a: `x = ${F("π", 3)}, ${F("5π", 3)}, ${F("13π", 3)}` },
+{ t: "solve", q: `Find the general solution of 3 + 2 sin x = 2, and hence all solutions on the domain 0 ≤ x ≤ 4π.`,
+  s: ["sin x = −1/2, with reference angle π/6", "Sine is negative in the third and fourth quadrants: x = 7π/6 and x = 11π/6", "General solution: x = 7π/6 + 2πn or x = 11π/6 + 2πn", "n = 0 and n = 1 give four solutions in [0, 4π]"], a: `${F("7π", 6)}, ${F("11π", 6)}, ${F("19π", 6)}, ${F("23π", 6)}` },
+{ t: "solve", q: `Find the values of x where f(x) = 2 + 3 sin 2x meets the line y = 3. Give the general solution in degrees, to two decimal places.`,
+  s: ["2 + 3 sin 2x = 3, so sin 2x = 1/3", "2x = 19.47° or 2x = 180° − 19.47° = 160.53° (plus multiples of 360°)", "Divide by 2"], a: "x = 9.74° + 180°n or x = 80.26° + 180°n, n ∈ ℤ", also: ["tgraph"] },
+
+/* Graphs of trig functions */
+{ t: "tgraph", q: `State the range, amplitude, midway line and period of g(x) = −2 cos x and m(x) = 2 + cos x.`,
+  s: ["g(x): −2 cos x oscillates between −2 and 2 about y = 0", "m(x): 2 + cos x oscillates between 1 and 3 about y = 2", "The period of cos x is 2π and neither function changes it"], a: "g: range [−2, 2], amplitude 2, midway line y = 0, period 2π. m: range [1, 3], amplitude 1, midway line y = 2, period 2π" },
+{ t: "tgraph", q: `A function f(x) = a + b sin(cx), with b > 0 and c > 0, has range [2.5, 3.5] and period π. Find f(x).`,
+  s: ["Midway line: a = (2.5 + 3.5)/2 = 3", "Amplitude: b = (3.5 − 2.5)/2 = 1/2", "Period 2π/c = π, so c = 2"], a: `f(x) = 3 + ${F(1, 2)} sin 2x` },
+{ t: "tgraph", q: `A function f(x) = a + b sin(cx) has range [3, 5] and period 3π. It starts on its midway line and then decreases. Find f(x).`,
+  s: ["a = 4 and |b| = 1", "It decreases from the midway line, so b = −1", "Period 2π/c = 3π, so c = 2/3"], a: `f(x) = 4 − sin(${F("2x", 3)})` },
+{ t: "tgraph", q: `A function f(x) = a + b sin(cx) has range [−10, 2]. It starts on its midway line and rises, and returns to the midway line (falling) at x = 3π. Find f(x).`,
+  s: ["a = (−10 + 2)/2 = −4 and b = 6 (it rises first)", "A half rotation takes 3π, so the period is 6π and c = 2π/6π = 1/3"], a: `f(x) = −4 + 6 sin(${F("x", 3)})` },
+{ t: "tgraph", q: `State the domain, range and period of f(x) = tan x, and write down the equations of its asymptotes.`,
+  s: ["tan x = sin x/cos x is undefined wherever cos x = 0", "That happens at x = π/2 + nπ"], a: "Domain: all real x except x = π/2 + nπ; range: ℝ; period π. The asymptotes are x = π/2 + nπ" },
+{ t: "tgraph", q: `For f(x) = tan(${F("3x", 2)}) find the period, the equations of the asymptotes either side of the origin, and one point on the curve other than the origin.`,
+  s: ["Period = π ÷ (3/2) = 2π/3", "Asymptotes where 3x/2 = ±π/2, so x = ±π/3", "At x = π/6: tan(3(π/6)/2) = tan(π/4) = 1"], a: `Period ${F("2π", 3)}; asymptotes x = ${F("π", 3)} and x = −${F("π", 3)}; the point (${F("π", 6)}, 1) lies on the curve` },
+{ t: "tgraph", q: `For f(x) = tan(x + ${F("π", 2)}) state the period, the asymptotes in the interval −π ≤ x ≤ π, and the x-intercepts in that interval.`,
+  s: ["The shift does not change the period: π", "Asymptotes where x + π/2 = π/2 + nπ, so x = nπ: x = −π, 0 and π", "Zeros where x + π/2 = nπ, so x = nπ − π/2: x = −π/2 and π/2"], a: `Period π; asymptotes x = −π, 0, π; x-intercepts at −${F("π", 2)} and ${F("π", 2)}` },
+
+/* Proofs of the rules */
+{ t: "proof", q: `Use the area formula ½ab sin C to prove the sine rule a/sin A = b/sin B = c/sin C.`,
+  s: ["The same triangle has area ½ab sin C = ½bc sin A = ½ca sin B", "Divide every expression by ½abc", "sin C/c = sin A/a = sin B/b", "Take reciprocals"], a: `${F("a", "sin A")} = ${F("b", "sin B")} = ${F("c", "sin C")}` },
+{ t: "proof", q: `Use the cosine rule to show that if a² + b² = c² in triangle ABC then angle C = 90°.`,
+  s: ["Cosine rule: c² = a² + b² − 2ab cos C", "If c² = a² + b² then 2ab cos C = 0", "a and b are not zero, so cos C = 0"], a: "cos C = 0, so C = 90° (the converse of Pythagoras’ theorem)" },
+
+/* Sine, cosine and area rules */
+{ t: "rules", q: `A triangle has sides 8 cm, 9 cm and 10 cm. Find all three angles and the area of the triangle.`,
+  s: ["Angle opposite 10: 100 = 64 + 81 − 144 cos A, so cos A = 45/144 and A ≈ 71.8°", "Angle opposite 9: 81 = 64 + 100 − 160 cos B, so cos B = 83/160 and B ≈ 58.8°", "Third angle = 180° − 71.8° − 58.8° ≈ 49.5° (from unrounded values)", "Area = ½(8)(9) sin 71.8°"], a: "Angles ≈ 71.8°, 58.8° and 49.5°; area ≈ 34.2 cm²" },
+{ t: "rules", q: `In triangle ABC, |AC| = 8 cm, |CB| = 6 cm and ∠CAB = 45°. Find the two possible values of ∠CBA to the nearest degree.`,
+  s: ["Sine rule: sin B/8 = sin 45°/6", "sin B = 8 sin 45°/6 ≈ 0.9428", "B ≈ 71°, or B = 180° − 71° = 109° (two triangles are possible because 6 < 8)"], a: "71° or 109°" },
+{ t: "rules", q: `In triangle ABC, |AC| is 2 cm longer than |AB|, ∠ABC = 70° and ∠ACB = 60°. Find |AB| and the area of the triangle.`,
+  s: ["Let |AB| = x, so |AC| = x + 2. Sine rule: (x + 2)/sin 70° = x/sin 60°", "(x + 2) sin 60° = x sin 70°, so x(sin 70° − sin 60°) = 2 sin 60°", "x = 2 sin 60°/(sin 70° − sin 60°) ≈ 23.5", "∠A = 50°, so area = ½(x)(x + 2) sin 50°"], a: "|AB| ≈ 23.5 cm and area ≈ 229.7 cm² (using unrounded values)" },
+{ t: "rules", q: `The area of a triangle is 200 cm² and two of its sides are 20 cm and 32 cm. Find the possible lengths of the third side.`,
+  s: ["Area = ½(32)(20) sin A = 320 sin A = 200, so sin A = 5/8", "A is the angle between the given sides: A ≈ 38.7° or A = 180° − 38.7° = 141.3°", "Cosine rule: x² = 32² + 20² − 2(32)(20) cos A", "A = 38.7°: x² ≈ 424.8, so x ≈ 20.6. A = 141.3°: x² ≈ 2423.2, so x ≈ 49.2"], a: "≈ 20.6 cm or ≈ 49.2 cm" },
+
+/* 3D problems */
+{ t: "threeD", q: `A cube has edge x cm. Find the length of a space diagonal in terms of x, and the angle between two space diagonals to the nearest minute.`,
+  s: ["Face diagonal = √(x² + x²) = √2x, and space diagonal = √(2x² + x²) = √3x", "Two space diagonals cross at the centre O; each half has length √3x/2, and the triangle they form with an edge of the cube has opposite side x", "Cosine rule: x² = 3x²/4 + 3x²/4 − 2(3x²/4)cos θ, so cos θ = 1/3", "θ = cos⁻¹(1/3) = 70.53°"], a: `Space diagonal ${SQ(3)}x cm; angle ≈ 70°32′`, also: ["rules"] },
+{ t: "threeD", q: `A right pyramid has a square base of edge 10 cm and sloping edges of 13 cm. Find the height of each triangular face, the total surface area, and the vertical height of the pyramid.`,
+  s: ["Each face is isosceles with base 10 and equal sides 13: height = √(13² − 5²) = 12 cm", "Surface area = base + four faces = 100 + 4 × ½(10)(12)", "Half the base diagonal = 5√2, so the vertical height = √(13² − 50) = √119"], a: `Face height 12 cm; surface area 340 cm²; vertical height ${SQ(119)} ≈ 10.9 cm` },
+{ t: "threeD", q: `A man stands 24 m from the foot of a building and sees its top at an angle of elevation of 20°. A second man sees the top at an angle of elevation of 40°. The angle at the foot of the building between the two men is 92°. Find the height of the building and the distance between the two men.`,
+  s: ["Height = 24 tan 20° ≈ 8.74 m", "Second man’s distance from the foot = 8.74/tan 40° ≈ 10.41 m", "Cosine rule: d² = 24² + 10.41² − 2(24)(10.41) cos 92° ≈ 702", "d ≈ 26.5 m"], a: "Height ≈ 8.74 m; distance ≈ 26.5 m", also: ["right", "rules"] },
 ];
+// ---------- diagrams (drawn lazily by the page; see drawing() in app) ----------
+const sq5 = Math.sqrt;
+function rtri(base, ht, o = {}) { // right triangle, right angle at bottom-left? no: at bottom-right
+  const P = [[0, 0], [base, 0], [base, ht]];
+  const it = [{ k: "poly", pts: P, fill: "rgba(85,117,99,.08)" }, { k: "rt", v: P[1], a0: 90 }];
+  it[1] = { k: "rt", v: P[1], a0: 90, sz: 10 };
+  // right-angle square must sit inside: arms go left (180°) and up (90°) from P[1]
+  it[1] = { k: "rt", v: P[1], a0: 90 };
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  if (o.bl) it.push({ k: "txt", p: mid(P[0], P[1]), t: o.bl, dy: 18, c: ACC });
+  if (o.vl) it.push({ k: "txt", p: mid(P[1], P[2]), t: o.vl, dx: o.vdx == null ? 16 : o.vdx, dy: 5, an: o.vdx == null ? "start" : "end", c: ACC });
+  if (o.hl) it.push({ k: "txt", p: mid(P[0], P[2]), t: o.hl, dx: -6, dy: -8, an: "end", c: ACC });
+  if (o.al) it.push({ k: "ang", v: P[0], a0: 0, a1: degOf(Math.atan2(ht, base)), r: 34, t: o.al, tr: 14 });
+  if (o.bl2) it.push({ k: "ang", v: P[2], a0: 180 + degOf(Math.atan2(ht, base)) - 0, a1: 270, r: 30, t: o.bl2, tr: 13 });
+  if (o.names) it.push({ k: "txt", p: P[0], t: o.names[0], dx: -12, dy: 16, it: true, size: 16 }, { k: "txt", p: P[1], t: o.names[1], dx: 12, dy: 16, it: true, size: 16 }, { k: "txt", p: P[2], t: o.names[2], dx: 12, dy: -6, it: true, size: 16 });
+  return fig(it);
+}
+// side view: tower/cliff/building of height h at x = 0, viewing points to the right
+function vert(h, pts, o = {}) {
+  const xm = Math.max(...pts.map((p) => p.x)) * 1.08, it = [];
+  it.push({ k: "line", a: [-xm * 0.06, 0], b: [xm, 0], w: 1.6 });
+  it.push({ k: "poly", pts: [[-xm * 0.05, 0], [0, 0], [0, h], [-xm * 0.05, h]], fill: "rgba(106,103,95,.14)", c: MUT, w: 1.4 });
+  it.push({ k: "rt", v: [0, 0], a0: 0 });
+  if (o.hl) it.push({ k: "txt", p: [0, h / 2], t: o.hl, dx: -10, dy: 5, an: "end", c: ACC });
+  if (o.top) it.push({ k: "pt", p: [0, h], t: o.top, dx: -10, dy: -8, an: "end", it: true, dot: false, size: 16 });
+  if (o.foot) it.push({ k: "pt", p: [0, 0], t: o.foot, dx: -10, dy: 16, an: "end", it: true, dot: false, size: 16 });
+  const down = !!o.depr;
+  pts.forEach((p) => {
+    it.push({ k: "line", a: [p.x, 0], b: [0, h], c: p.c || BLU, w: 1.7 });
+    it.push({ k: "pt", p: [p.x, 0], t: p.n, dx: 0, dy: 18, an: "middle", it: true, c: ACC, tc: INK, size: 15 });
+    if (p.th) {
+      if (down) { it.push({ k: "ang", v: [0, h], a0: -p.th, a1: 0, r: 34 + (p.r || 0), t: p.tl, tr: 12 }); }
+      else it.push({ k: "ang", v: [p.x, 0], a0: 180 - p.th, a1: 180, r: 30 + (p.r || 0), t: p.tl, tr: 13 });
+    }
+  });
+  if (down) it.push({ k: "line", a: [0, h], b: [xm, h], dash: true, c: MUT, w: 1.3 });
+  (o.dist || []).forEach((d) => { it.push({ k: "line", a: [d.a, 0], b: [d.b, 0], c: ACC, w: 3 }); it.push({ k: "txt", p: [(d.a + d.b) / 2, 0], t: d.t, dy: d.dy || 34, c: ACC }); });
+  (o.extra || []).forEach((e) => it.push(e));
+  return fig(it, { m: 36 });
+}
+const projAng = (v, a, b) => [degOf(Math.atan2(a[1] - v[1], a[0] - v[0])), degOf(Math.atan2(b[1] - v[1], b[0] - v[0]))];
+function mast3d(o) { // foot Q at origin; A on the x-axis at distance qa; B along the depth axis at distance qb
+  const Q = P3(0, 0, 0), A = P3(o.qa, 0, 0), B = P3(0, o.qb, 0), Tp = P3(0, 0, o.h), it = [];
+  it.push({ k: "poly", pts: [Q, A, B], fill: "rgba(106,103,95,.10)", c: MUT, w: 1.3 });
+  it.push({ k: "line", a: Q, b: Tp, w: 2.4 });
+  it.push({ k: "line", a: Tp, b: A, c: BLU }, { k: "line", a: Tp, b: B, c: BLU });
+  it.push({ k: "pt", p: Tp, t: o.T, dx: -8, dy: -4, an: "end", it: true, size: 16, dot: false }, { k: "pt", p: Q, t: o.Qn, dx: -9, dy: 16, an: "end", it: true, size: 16, dot: false },
+    { k: "pt", p: A, t: o.An, dx: 6, dy: 16, an: "start", it: true, size: 16, dot: false }, { k: "pt", p: B, t: o.Bn, dx: 8, dy: 4, an: "start", it: true, size: 16, dot: false });
+  [[A, Q, Tp, o.la], [B, Q, Tp, o.lb]].forEach(([v, p1, p2, t]) => { const [a0, a1] = projAng(v, Tp, p1); let x0 = a0, x1 = a1; if (((x1 - x0) % 360 + 360) % 360 > 180) { const z = x0; x0 = x1; x1 = z; } x1 = x0 + (((x1 - x0) % 360) + 360) % 360; it.push({ k: "ang", v, a0: x0, a1: x1, r: 26, t, tr: 12 }); });
+  if (o.gl) it.push({ k: "txt", p: [(Q[0] * .55 + A[0] * .0 + B[0] * .0) + 0.3, Q[1] + 0.18], t: o.gl, c: ACC, size: 13, dx: 14, dy: -4 });
+  (o.lab || []).forEach((l) => it.push({ k: "txt", p: [(l.a[0] + l.b[0]) / 2, (l.a[1] + l.b[1]) / 2], t: l.t, dx: l.dx || 0, dy: l.dy || 0, c: ACC, size: 13, an: l.an }));
+  return fig(it, { m: 40 });
+}
+// altitude helper for proof figures
+function altTri(P, names, k, o = {}) {
+  const items = triItems(P, { names, sides: o.sides, angs: o.angs, ar: o.ar });
+  const i = (k + 1) % 3, j = (k + 2) % 3, A = P[i], B = P[j], C = P[k];
+  const dx = B[0] - A[0], dy = B[1] - A[1], tt = ((C[0] - A[0]) * dx + (C[1] - A[1]) * dy) / (dx * dx + dy * dy), Dp = [A[0] + tt * dx, A[1] + tt * dy];
+  items.push({ k: "line", a: C, b: Dp, dash: true, c: ACC, w: 1.6 });
+  const u = [B[0] - Dp[0], B[1] - Dp[1]], w = [C[0] - Dp[0], C[1] - Dp[1]], cr = u[0] * w[1] - u[1] * w[0];
+  items.push({ k: "rt", v: Dp, a0: degOf(Math.atan2(cr > 0 ? u[1] : w[1], cr > 0 ? u[0] : w[0])), sz: 9 });
+  items.push({ k: "txt", p: Dp, t: o.D || "D", dx: o.Ddx || 0, dy: o.Ddy || 17, it: true, size: 16 });
+  if (o.hl) items.push({ k: "txt", p: [(C[0] + Dp[0]) / 2, (C[1] + Dp[1]) / 2], t: o.hl, dx: 12, dy: 4, an: "start", c: ACC });
+  (o.seg || []).forEach((s) => items.push({ k: "txt", p: [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2], t: s.t, dy: 33, c: GRN }));
+  return fig(items);
+}
+const D = {
+  // ---- radians & sectors ----
+  s63: () => sectorFig({ deg: 172, rl: "6 cm", al: "θ", arcl: "arc", pts: ["A", "B"] }),
+  s64: () => sectorFig({ deg: 115, rl: "r", al: "θ", pts: ["A", "B"] }),
+  s65: () => sectorFig({ deg: 86, rl: "10 cm", al: "θ", arcl: "15 cm", pts: ["A", "B"] }),
+  s66: () => sectorFig({ deg: 150, rl: "r", al: "5π/6", pts: ["A", "B"] }),
+  s294: () => sectorFig({ deg: 114.6, rl: "5 cm", al: "2 rad", pts: ["A", "B"] }),
+  s295: () => sectorFig({ deg: 220, al: "220°", pts: ["A", "B"] }),
+  s298: () => sectorFig({ deg: 34.4, rl: "80 cm", al: "0.6 rad", arcl: "arc", pts: ["A", "B"] }),
+  conc: () => { const O = [0, 0], th0 = 55, th1 = 125, it = []; [10, 12, 14].forEach((r, i) => it.push({ k: "arc", cc: O, r, a0: th0, a1: th1, w: i === 1 ? 2.8 : 2, c2: 0 })); 
+    it.push({ k: "line", a: O, b: pol(O, 14, th0) }, { k: "line", a: O, b: pol(O, 14, th1) });
+    [["A", 10, th0], ["C", 12, th0], ["E", 14, th0]].forEach(([n, r, a]) => it.push({ k: "pt", p: pol(O, r, a), t: n, dx: 8, dy: 4, it: true }));
+    [["B", 10, th1], ["D", 12, th1], ["F", 14, th1]].forEach(([n, r, a]) => it.push({ k: "pt", p: pol(O, r, a), t: n, dx: -16, dy: 4, it: true }));
+    it.push({ k: "pt", p: O, t: "O", dx: -4, dy: 16, it: true }, { k: "ang", v: O, a0: th0, a1: th1, r: 34, t: "θ", tr: 12 });
+    
+    return fig(it, { m: 36 }); },
+  s297: () => { const r = 4, O = [0, 0], a0 = 90 - 60, a1 = 90 + 60, A = pol(O, r, a0), B = pol(O, r, a1), it = [];
+    it.push({ k: "sector", cc: O, r, a0: a1, a1: a0 + 360, fill: "rgba(185,91,60,.10)", w: 1.6 }); // reflex sector (below)
+    it.push({ k: "arc", cc: O, r, a0: a1, a1: a0 + 360, c: ACC, w: 2.6 });
+    it.push({ k: "line", a: A, b: B, dash: true, c: MUT }, { k: "line", a: O, b: A }, { k: "line", a: O, b: B });
+    it.push({ k: "pt", p: O, t: "O", dx: 4, dy: 18, it: true }, { k: "pt", p: A, t: "A", dx: 8, dy: -2, it: true }, { k: "pt", p: B, t: "B", dx: -16, dy: -2, it: true });
+    it.push({ k: "txt", p: pol(O, 2.2, 270), t: "reflex", c: ACC, size: 14 }, { k: "txt", p: [0, 1.0], t: "?", c: MUT, size: 14 }, { k: "txt", p: pol(O, 2.2, 150), t: "4 cm", dx: -4, dy: -12, c: ACC, size: 12, an: "end" });
+    return fig(it, { m: 34 }); },
+  // ---- right-angled triangles & elevation ----
+  r67: () => rtri(4.45, 1.05, { hl: "4.5 m", vl: "0.6 m", al: "θ", vdx: -8 }),
+  r71: () => { const th = 70, x = 6 * Math.cos(rad(th)), y = 6 * Math.sin(rad(th)); return vert(y, [{ x, n: "", th, tl: "70°" }], { hl: "h", extra: [{ k: "txt", p: [x / 2, y / 2], t: "6 m", dx: 18, dy: -4, c: ACC }, ] }); },
+  r69: () => { const h = 25 * sq5(3); return vert(h, [{ x: 25, n: "B", th: 60, tl: "60°" }, { x: 75, n: "A", th: 30, tl: "30°", r: 4 }], { hl: "h", top: "T", foot: "F", dist: [{ a: 25, b: 75, t: "50 m" }] }); },
+  r69s: () => { const h = 25 * sq5(3); return vert(h, [{ x: 25, n: "B", th: 60, tl: "60°" }, { x: 75, n: "A", th: 30, tl: "30°", r: 4 }], { hl: "h = 25√3", top: "T", foot: "F", dist: [{ a: 25, b: 75, t: "50 m" }], extra: [{ k: "txt", p: [25 / 2, 0], t: "x", dy: -8, c: GRN, size: 14, it: true }, { k: "txt", p: [50, 0], t: "x + 50", dy: -8, c: GRN, size: 14 }].slice(0, 0) }); },
+  r70: () => vert(80, [{ x: 80, n: "B₁", th: 45, tl: "45°", c: BLU }, { x: 80 * sq5(3), n: "B₂", th: 30, tl: "30°", r: 34 }], { depr: true, hl: "80 m", top: "T", foot: "F", dist: [{ a: 80, b: 80 * sq5(3), t: "?" , dy: 34}] }),
+  r301: () => { const H = 2.81, x = H / Math.tan(rad(62)); return vert(H, [{ x, n: "", th: 62, tl: "62°" }, { x: x + 3, n: "", th: 32, tl: "32°", r: 4 }], { hl: "h", extra: [{ k: "line", a: [x, 0], b: [x + 3, 0], c: ACC, w: 3.5 }, { k: "txt", p: [x + 1.5, 0], t: "3 m", dy: 22, c: ACC }, { k: "txt", p: [x / 2, 0], t: "x", dy: -8, c: GRN, it: true }] }); },
+  r302: () => vert(40, [{ x: 40 / Math.tan(rad(25)), n: "boat", th: 25, tl: "25°" }], { depr: true, hl: "40 m", top: "", foot: "", extra: [{ k: "txt", p: [40 / Math.tan(rad(25)) / 2, 0], t: "?", dy: 28, c: ACC }] }),
+  r299: () => rtri(12, 12 * sq5(1 / (1 - 4 / 9) - 1) , { bl: "12 cm", hl: "?", al: "x" }),
+  // ---- sine & cosine rules ----
+  t86: () => tri(triSSS(7, 8, 13), { names: ["A", "B", "C"], sides: ["7 cm", "8 cm", "13 cm"] }),
+  t86s: () => tri(triSSS(7, 8, 13), { names: ["A", "B", "C"], sides: ["7", "8", "13"], angs: [null, null, "120°"] }),
+  t90: () => tri(triSSS(7, 5, 8), { names: ["A", "B", "C"], sides: ["7 cm", "5 cm", "8 cm"], angs: ["θ", null, null] }),
+  t319: () => tri(triSSS(8, 9, 10), { names: ["A", "B", "C"], sides: ["8 cm", "9 cm", "10 cm"] }),
+  t89: () => tri([[8, 0], [0, 0], [6 * Math.cos(rad(120)), 6 * Math.sin(rad(120))]], { names: ["A", "B", "C"], sides: ["6 cm", "?", "8 cm"], angs: [null, "120°", null], ar: 20 }),
+  t91: () => tri([[8, 0], [0, 0], [11 * Math.cos(rad(52)), 11 * Math.sin(rad(52))]], { names: ["P", "Q", "R"], sides: ["11 cm", "?", "8 cm"], angs: [null, "52°", null], ar: 24 }),
+  t321: () => tri(triASA(70, 10, 60), { names: ["B", "C", "A"], sides: ["x + 2", "x", null], angs: ["70°", "60°", null] }),
+  t322: () => tri(triSAS(32, 38, 20), { names: ["", "", ""], sides: ["?", "32 cm", "20 cm"], angs: ["θ", null, null] }),
+  t322s: () => { const th = 38.68, P = triSAS(32, th, 20), Q = triSAS(32, 180 - th, 20), it = [{ k: "poly", pts: P, fill: "rgba(85,117,99,.10)" }, { k: "poly", pts: Q, fill: "rgba(185,91,60,.08)", c: ACC, dash: true }];
+    it.push({ k: "ang", v: P[0], a0: 0, a1: th, r: 30, t: "38.7°", tr: 20 }, { k: "ang", v: Q[0], a0: 0, a1: 180 - th, r: 62, t: "141.3°", tr: 18, c: ACC });
+    it.push({ k: "txt", p: [(P[1][0] + P[2][0]) / 2, (P[1][1] + P[2][1]) / 2], t: "20.6", dx: 14, dy: 4, c: GRN }, { k: "txt", p: [(Q[1][0] + Q[2][0]) / 2, (Q[1][1] + Q[2][1]) / 2], t: "49.2", dx: -2, dy: -8, c: ACC });
+    return fig(it); },
+  t87: () => { const A = [0, 0], B = [10, 0], dir = pol(A, 12.5, 40), it = [{ k: "line", a: A, b: B, w: 2 }, { k: "line", a: A, b: dir, dash: true, c: LNS, w: 1.2 }, { k: "ang", v: A, a0: 0, a1: 40, r: 30, t: "40°", tr: 13 }];
+    it.push({ k: "pt", p: A, t: "A", dx: -14, dy: 16, it: true, size: 16, dot: false }, { k: "pt", p: B, t: "B", dx: 6, dy: 16, it: true, size: 16, dot: false }, { k: "txt", p: [5, 0], t: "10 cm", dy: 20, c: ACC });
+    it.push({ k: "arc", cc: B, r: 7, a0: 100, a1: 170, c: GRN, w: 2 }, { k: "txt", p: pol(B, 7, 135), t: "7 cm", dx: -22, dy: -4, c: GRN, size: 13 }, { k: "pt", p: pol(A, 5, 40), t: "", dot: false }); return fig(it); },
+  t87s: () => { const A = [0, 0], B = [10, 0], d = 10 * Math.cos(rad(40)), hh = 10 * Math.sin(rad(40)), o = Math.sqrt(49 - hh * hh), C1 = pol(A, d - o, 40), C2 = pol(A, d + o, 40), it = [];
+    it.push({ k: "poly", pts: [A, B, C2], fill: "rgba(185,91,60,.07)", c: ACC, dash: true }, { k: "poly", pts: [A, B, C1], fill: "rgba(85,117,99,.12)" });
+    it.push({ k: "pt", p: A, t: "A", dx: -14, dy: 16, it: true, size: 16, dot: false }, { k: "pt", p: B, t: "B", dx: 6, dy: 16, it: true, size: 16, dot: false }, { k: "pt", p: C1, t: "C₁", dx: -26, dy: -6, it: true, size: 15, dot: false }, { k: "pt", p: C2, t: "C₂", dx: 6, dy: -4, it: true, size: 15, dot: false });
+    it.push({ k: "ang", v: C1, a0: degOf(Math.atan2(B[1] - C1[1], B[0] - C1[0])) - 0, a1: degOf(Math.atan2(A[1] - C1[1], A[0] - C1[0])) + 360 - 0, r: 14, t: "", c: ACC });
+    it.pop(); it.push({ k: "txt", p: C1, t: "113.3°", dx: 36, dy: 16, c: GRN, size: 12 }, { k: "txt", p: C2, t: "66.7°", dx: 8, dy: 20, c: ACC, size: 12 });
+    return fig(it); },
+  t320: () => { const A = [0, 0], C = [8, 0], ray = pol(A, 9.5, 45), it = [{ k: "line", a: A, b: C, w: 2 }, { k: "line", a: A, b: ray, dash: true, c: LNS, w: 1.2 }, { k: "ang", v: A, a0: 0, a1: 45, r: 30, t: "45°", tr: 13 }];
+    it.push({ k: "pt", p: A, t: "A", dx: -14, dy: 16, it: true, size: 16, dot: false }, { k: "pt", p: C, t: "C", dx: 8, dy: 16, it: true, size: 16, dot: false }, { k: "txt", p: [4, 0], t: "8 cm", dy: 20, c: ACC });
+    it.push({ k: "arc", cc: C, r: 6, a0: 112, a1: 160, c: GRN, w: 2 }, { k: "txt", p: pol(C, 6, 135), t: "6 cm", dx: -22, dy: -4, c: GRN, size: 13 }); return fig(it); },
+  t320s: () => { const A = [0, 0], C = [8, 0], ct = 8 * Math.cos(rad(45)), o = 2, B1 = pol(A, ct + o, 45), B2 = pol(A, ct - o, 45), it = [];
+    it.push({ k: "poly", pts: [A, C, B1], fill: "rgba(185,91,60,.07)", c: ACC, dash: true }, { k: "poly", pts: [A, C, B2], fill: "rgba(85,117,99,.12)" });
+    it.push({ k: "pt", p: A, t: "A", dx: -14, dy: 16, it: true, size: 16, dot: false }, { k: "pt", p: C, t: "C", dx: 8, dy: 16, it: true, size: 16, dot: false }, { k: "pt", p: B1, t: "B₁", dx: 6, dy: -4, it: true, size: 15, dot: false }, { k: "pt", p: B2, t: "B₂", dx: -26, dy: -6, it: true, size: 15, dot: false });
+    it.push({ k: "txt", p: B1, t: "71°", dx: 22, dy: 16, c: ACC, size: 12 }, { k: "txt", p: B2, t: "109°", dx: 36, dy: 20, c: GRN, size: 12 }); return fig(it); },
+  t88: () => { const B = [0, 0], A = [5, 0], C = pol(B, 8, 60), cd = degOf(Math.atan2(A[1] - C[1], A[0] - C[0])); const c1 = pol(C, 6, cd + 50), c2 = pol(C, 6, cd - 50); const Dp = Math.hypot(c1[0] - B[0], c1[1] - B[1]) > Math.hypot(c2[0] - B[0], c2[1] - B[1]) ? c1 : c2;
+    const cr = (Dp[0] - C[0]) * (A[1] - C[1]) - (Dp[1] - C[1]) * (A[0] - C[0]); const it = [{ k: "poly", pts: [A, B, C, Dp], fill: "rgba(85,117,99,.08)" }, { k: "line", a: A, b: C, dash: true, c: MUT }];
+    it.push({ k: "pt", p: A, t: "A", dx: 8, dy: 14, it: true, size: 16, dot: false }, { k: "pt", p: B, t: "B", dx: -14, dy: 14, it: true, size: 16, dot: false }, { k: "pt", p: C, t: "C", dx: -6, dy: -10, it: true, size: 16, dot: false }, { k: "pt", p: Dp, t: "D", dx: 10, dy: -4, it: true, size: 16, dot: false });
+    it.push({ k: "ang", v: B, a0: 0, a1: 60, r: 26, t: "60°", tr: 14 });
+    const an1 = degOf(Math.atan2(A[1] - C[1], A[0] - C[0])), an2 = degOf(Math.atan2(Dp[1] - C[1], Dp[0] - C[0])); const lo = Math.min(an1, an2), hi = Math.max(an1, an2); it.push({ k: "ang", v: C, a0: hi - lo > 180 ? hi : lo, a1: hi - lo > 180 ? lo + 360 : hi, r: 24, t: "50°", tr: 15 });
+    const m = (p, q, t, dx, dy) => it.push({ k: "txt", p: [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], t, dx, dy, c: ACC, size: 13 });
+    m(A, B, "5", 0, 18); m(B, C, "8", -14, -2); m(C, Dp, "6", 8, -8); return fig(it); },
+  // ---- proofs ----
+  pf82: () => altTri(triSSS(7, 8, 6), ["A", "B", "C"], 2, { sides: ["a", "b", "c"], hl: "h" }),
+  pf83: () => altTri(triSSS(7, 8, 6), ["A", "B", "C"], 2, { sides: ["a", "b", "c"], hl: "h", angs: ["A", null, null] }),
+  pf84: () => altTri(triSSS(7, 8, 6), ["A", "B", "C"], 0, { sides: ["a", "b", "c"], hl: "h" }),
+  pf85: () => altTri(triSSS(7, 8, 6), ["A", "B", "C"], 1, { Ddx: -14, Ddy: 6, sides: ["a", "b", "c"], hl: "h", angs: [null, null, "C"] }),
+  // ---- 3D ----
+  d92: () => rtri(20, 15, { bl: "20 m", vl: "15 m", hl: "?", al: "θ", names: ["A", "F", "T"] }),
+  d93: () => { const w = 8, d = 8, ap = Math.sqrt(81 - 32), it = pyrItems(w, d, ap), V = P3(w / 2, d / 2, ap), O = P3(w / 2, d / 2, 0), A = P3(0, 0, 0), B = P3(w, 0, 0), C = P3(w, d, 0), Dd = P3(0, d, 0);
+    it.push({ k: "line", a: V, b: O, dash: true, c: ACC, w: 1.5 });
+    it.push({ k: "pt", p: V, t: "V", dx: 6, dy: -4, it: true, size: 16, dot: false }, { k: "pt", p: A, t: "A", dx: -12, dy: 14, it: true, size: 16, dot: false }, { k: "pt", p: B, t: "B", dx: 8, dy: 14, it: true, size: 16, dot: false }, { k: "pt", p: C, t: "C", dx: 8, dy: 4, it: true, size: 16, dot: false }, { k: "pt", p: Dd, t: "D", dx: -12, dy: 4, it: true, size: 16, dot: false }, { k: "pt", p: O, t: "O", dx: 6, dy: 14, it: true, size: 14, dot: false });
+    it.push({ k: "txt", p: [(V[0] + A[0]) / 2, (V[1] + A[1]) / 2], t: "9 cm", dx: -24, dy: -4, c: ACC, size: 13 }, { k: "txt", p: [(A[0] + B[0]) / 2, 0], t: "8 cm", dy: 30, c: ACC, size: 13, nofit: true }, { k: "txt", p: [(V[0] + O[0]) / 2, (V[1] + O[1]) / 2], t: "h", dx: 10, dy: 4, c: ACC, it: true });
+    return fig(it, { m: 36 }); },
+  d324: () => { const w = 10, d = 10, ap = Math.sqrt(169 - 50), it = pyrItems(w, d, ap), V = P3(w / 2, d / 2, ap), O = P3(w / 2, d / 2, 0), A = P3(0, 0, 0), B = P3(w, 0, 0), C = P3(w, d, 0), Dd = P3(0, d, 0), M = P3(w / 2, 0, 0);
+    it.push({ k: "line", a: V, b: O, dash: true, c: ACC, w: 1.5 }, { k: "line", a: V, b: M, c: GRN, w: 1.6 });
+    it.push({ k: "pt", p: V, t: "V", dx: 6, dy: -4, it: true, size: 16, dot: false }, { k: "pt", p: A, t: "A", dx: -12, dy: 14, it: true, size: 16, dot: false }, { k: "pt", p: B, t: "B", dx: 8, dy: 14, it: true, size: 16, dot: false }, { k: "pt", p: C, t: "C", dx: 8, dy: 4, it: true, size: 16, dot: false }, { k: "pt", p: Dd, t: "D", dx: -12, dy: 4, it: true, size: 16, dot: false }, { k: "pt", p: M, t: "M", dx: 0, dy: 16, it: true, size: 14, dot: false });
+    it.push({ k: "txt", p: [(V[0] + A[0]) / 2, (V[1] + A[1]) / 2], t: "13 cm", dx: -28, dy: -4, c: ACC, size: 13 }, { k: "txt", p: [(A[0] + B[0]) / 2 + 0, 0], t: "10 cm", dy: 30, c: ACC, size: 13, nofit: true });
+    return fig(it, { m: 36 }); },
+  d95: () => { const w = 12, d = 5, h = 4, it = boxItems(w, d, h), A = P3(0, 0, 0), G2 = P3(w, d, h); it.push({ k: "line", a: A, b: G2, dash: true, c: ACC, w: 2 });
+    it.push({ k: "pt", p: A, t: "A", dx: -12, dy: 14, it: true, size: 16, dot: false }, { k: "pt", p: G2, t: "G", dx: 6, dy: -6, it: true, size: 16, dot: false }, { k: "txt", p: P3(w / 2, 0, 0), t: "12 cm", dy: 20, c: ACC, size: 13 }, { k: "txt", p: P3(w, d / 2, 0), t: "5 cm", dx: 22, dy: 12, c: ACC, size: 13 }, { k: "txt", p: P3(w, 0, h / 2), t: "4 cm", dx: 20, dy: 4, c: ACC, size: 13 });
+    return fig(it, { m: 36 }); },
+  d323: () => { const x = 1, it = boxItems(x, x, x), A = P3(0, 0, 0), G2 = P3(x, x, x), Bb = P3(x, 0, 0), H = P3(0, x, x); it.push({ k: "line", a: A, b: G2, dash: true, c: ACC, w: 2 }, { k: "line", a: Bb, b: H, dash: true, c: BLU, w: 2 });
+    it.push({ k: "txt", p: P3(x / 2, 0, 0), t: "x", dy: 20, c: ACC, it: true }, { k: "pt", p: [(A[0] + G2[0]) / 2, (A[1] + G2[1]) / 2], t: "", dot: true, c: GRN });
+    return fig(it, { m: 40 }); },
+  d94: () => mast3d({ qa: 56.7, qb: 82.4, h: 47.6, T: "P", Qn: "Q", An: "A", Bn: "B", la: "40°", lb: "30°", lab: [{ a: P3(56.7, 0, 0), b: P3(0, 82.4, 0), t: "100 m", dx: 28, dy: -6 }] }),
+  d96: () => mast3d({ qa: 40, qb: 53.6, h: 25, T: "P", Qn: "Q", An: "A", Bn: "B", la: "32°", lb: "25°", gl: "90°", lab: [{ a: P3(0, 0, 0), b: P3(40, 0, 0), t: "40 m", dy: 18 }, { a: P3(40, 0, 0), b: P3(0, 53.6, 0), t: "?", dx: 28, dy: 0 }] }),
+  d325: () => mast3d({ qa: 24, qb: 10.4, h: 8.74, T: "T", Qn: "F", An: "M₁", Bn: "M₂", la: "20°", lb: "40°", gl: "92°", lab: [{ a: P3(0, 0, 0), b: P3(24, 0, 0), t: "24 m", dy: 18 }, { a: P3(24, 0, 0), b: P3(0, 10.4, 0), t: "?", dx: 20, dy: 0 }] }),
+};
+const at = (n, g, gs) => { const p = PROBLEMS[n - 1]; if (g) p.g = g; if (gs) p.gs = gs; };
+[[62, 0], [63, "s63"], [64, "s64"], [65, "s65"], [66, "s66"], [294, "s294"], [295, "s295"], [296, "conc"], [297, "s297"], [298, "s298"],
+ [67, "r67"], [69, "r69"], [70, "r70"], [71, "r71"], [299, "r299"], [301, "r301"], [302, "r302"],
+ [86, "t86", "t86s"], [87, "t87", "t87s"], [88, "t88"], [89, "t89"], [90, "t90"], [91, "t91"], [319, "t319"], [320, "t320", "t320s"], [321, "t321"], [322, "t322", "t322s"],
+ [82, "pf82"], [83, "pf83"], [84, "pf84"], [85, "pf85"], [317, "pf85"],
+ [92, "d92"], [93, "d93"], [95, "d95"], [94, "d94"], [96, "d96"], [323, "d323"], [324, "d324"], [325, "d325"]].forEach(([n, g, gs]) => g && at(n, g, gs));
+
+
+// ---- complex-number diagrams ----
+const Zp = (re, im) => [re, im];
+const lbl = (re, im) => ({ dx: re >= 0 ? 9 : -9, dy: im >= 0 ? -9 : 17, an: re >= 0 ? "start" : "end" });
+function cxPlot(pts, o = {}) { // pts: [{z:[re,im], t, c, vec, arc:[deg,label], dashFrom:[re,im]}]
+  const m = Math.max(...pts.map((p) => Math.max(Math.abs(p.z[0]), Math.abs(p.z[1]))), 1), pad = o.pad || Math.ceil(m) + 1, items = [];
+  pts.forEach((p) => {
+    if (p.arc) items.push({ k: "ang", v: [0, 0], a0: p.arc[0], a1: p.arc[1], r: p.arc[3] || 26, t: p.arc[2], c: p.c || ACC, tr: 12 });
+    if (p.from) items.push({ k: "line", a: p.from, b: p.z, arrow: true, c: GRN, w: 1.6 });
+    if (p.drop) items.push({ k: "line", a: [p.z[0], 0], b: p.z, dash: true, c: MUT, w: 1.1 }, { k: "line", a: [0, p.z[1]], b: p.z, dash: true, c: MUT, w: 1.1 });
+    if (p.mod) items.push({ k: "txt", p: [p.z[0] / 2, p.z[1] / 2], t: p.mod, dx: p.mdx == null ? -12 : p.mdx, dy: p.mdy == null ? -8 : p.mdy, c: p.c || ACC, size: 13, nofit: true });
+  });
+  return argand({ range: o.range || [-pad, pad, -pad, pad], step: o.step || (pad > 7 ? 2 : 1), items, pts: pts.map((p) => Object.assign({ z: p.z, t: p.t, c: p.c, vec: p.vec !== false }, lbl(p.z[0], p.z[1]), p.l || {})) });
+}
+function polList(list) { const pts = list.map((q, i) => { const z = pol([0, 0], q.r, q.deg); return { z, t: q.t, c: q.c, mod: q.mod, mdx: q.mdx, mdy: q.mdy, arc: q.deg > 1 && !q.noarc ? [0, q.deg, q.dl || q.deg + "°", 22 + 9 * i] : null }; }); return cxPlot(pts); }
+function conjPlot(roots, real) { const pts = []; roots.forEach(([a, b], i) => { pts.push({ z: [a, b], t: `${a}${b < 0 ? "−" : "+"}${Math.abs(b)}i`.replace("-", "−"), c: i ? BLU : BLU, drop: false }); pts.push({ z: [a, -b], t: `${a}${-b < 0 ? "−" : "+"}${Math.abs(b)}i`.replace("-", "−"), c: BLU }); });
+  (real || []).forEach((x) => pts.push({ z: [x[0], 0], t: x[1], c: ACC, vec: false, l: { dx: 0, dy: -10, an: "middle" } }));
+  const items = roots.map(([a, b]) => ({ k: "line", a: [a, b], b: [a, -b], dash: true, c: MUT, w: 1.1 })); const m = Math.max(...pts.map((p) => Math.max(Math.abs(p.z[0]), Math.abs(p.z[1]))), 1), pad = Math.ceil(m) + 1;
+  return argand({ range: [-pad, pad, -pad, pad], step: pad > 7 ? 2 : 1, items, pts: pts.map((p) => Object.assign({}, p, lbl(p.z[0], p.z[1]), p.l || {})) }); }
+function spiral(r0, perps, labs) { const O = [0, 0], it = []; let ang = 0, len = r0, P = pol(O, len, ang); it.push({ k: "line", a: O, b: P, w: 2 }, { k: "txt", p: [P[0] / 2, P[1] / 2], t: String(r0), dx: 0, dy: 16, c: ACC, size: 13 });
+  perps.forEach((c, i) => { const dir = ang + 90, Q = [P[0] + c * Math.cos(rad(dir)), P[1] + c * Math.sin(rad(dir))]; it.push({ k: "line", a: P, b: Q, w: 2 }, { k: "line", a: O, b: Q, c: BLU, w: 2 }, { k: "rt", v: P, a0: ang + 90 + 90 === 0 ? 0 : ang + 90, sz: 8 });
+    it.push({ k: "txt", p: [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2], t: (c === 1.414 ? "√2" : String(c)), dx: 12, dy: 4, c: ACC, size: 13 }, { k: "txt", p: [Q[0] / 2, Q[1] / 2], t: labs[i], dx: -8, dy: -6, c: BLU, size: 14, an: "end" });
+    ang = degOf(Math.atan2(Q[1], Q[0])); len = Math.hypot(Q[0], Q[1]); P = Q; });
+  it.push({ k: "pt", p: O, t: "", c: INK }); return fig(it, { m: 40 }); }
+Object.assign(D, {
+  c162: () => cxPlot([{ z: [1, -2], t: "z" }, { z: [0, 3], t: "w" }, { z: [3, -6], t: "3z", c: GRN }, { z: [1, 1], t: "z + w", c: GRN, from: [1, -2], vec: false }, { z: [6, 3], t: "zw", c: ACC }], { range: [-2, 8, -7, 4] }),
+  c163: () => cxPlot([{ z: [-2, 2 * sq5(3)], t: "m", mod: "4", arc: [0, 120, "120°"] }]),
+  c163s: () => cxPlot([{ z: [-2, 2 * sq5(3)], t: "m", arc: [0, 120, "120°"] }, { z: [-2 * sq5(3), -2], t: "i⁴⁵m = im", c: GRN, arc: [120, 210, "90°", 40] }]),
+  c166: () => cxPlot([{ z: [4, 2], t: "z", arc: [0, 26.57, "", 40] }, { z: [2, 6], t: "z(1 + i)", c: GRN, arc: [26.57, 71.57, "45°", 52] }]),
+  c167: () => cxPlot([{ z: [2, 5], t: "z" }, { z: [5, 3], t: "z + (3 − 2i)", c: GRN, vec: false, from: [2, 5] }], { range: [-1, 7, -1, 7] }),
+  c173: () => cxPlot([{ z: [3, 4], t: "3 + 4i", arc: [0, 53.13, "53.1°", 24] }, { z: [2, 1], t: "2 + i", c: GRN, arc: [0, 26.57, "26.6°", 44] }, { z: [-2, -1], t: "−2 − i", c: GRN }]),
+  c182: () => cxPlot([{ z: [3, 4], t: "3 + 4i", mod: "5", drop: true }, { z: [3, -4], t: "3 − 4i", mod: "5", drop: true, mdy: 16 }]),
+  c183: () => conjPlot([[1, 4]]),
+  c184: () => conjPlot([[-2, 2]], [[1, "1"]]),
+  c185: () => conjPlot([[3, 5]], [[-4 / 3, "−4/3"]]),
+  c188: () => conjPlot([[2, 1]], [[2 / 3, "2/3"]]),
+  p189: () => argPolar(6, -2, { rl: "2√10", tl: "342°", zl: "6 − 2i", drop: true }),
+  p190: () => argPolar(-3, -3, { rl: "3√2", tl: "225°", zl: "−3 − 3i", drop: true }),
+  p191: () => argPolar(-2, 0, { rl: "", tl: "180°", zl: "−2" }),
+  p192: () => argPolar(-5, 2, { rl: "√29", tl: "158.2°", zl: "−5 + 2i", drop: true }),
+  p193: () => argPolar(-sq5(3), 1, { rl: "2", tl: "150°", zl: "−√3 + i", drop: true }),
+  p194: () => argPolar(2, 2 * sq5(3), { rl: "4", tl: "60°", zl: "2 + 2√3 i", drop: true }),
+  p195: () => argPolar(-3 * sq5(2), 3 * sq5(2), { rl: "6", tl: "135°", zl: "−3√2 + 3√2 i", drop: true }),
+  p196: () => argPolar(-sq5(3), -1, { rl: "2", tl: "210°", zl: "−√3 − i", drop: true }),
+  p197: () => argPolar(0, -5, { rl: "", tl: "270°", zl: "−5i" }),
+  p198: () => argPolar(-4, 4 * sq5(3), { rl: "8", tl: "2π/3", zl: "−4 + 4√3 i", drop: true }),
+  m201: () => polList([{ r: 3, deg: 20, t: "z₁", noarc: true }, { r: 2, deg: 40, t: "z₂", c: BLU, noarc: true }, { r: 6, deg: 60, t: "z₁z₂", c: GRN, dl: "60° = 20° + 40°", mod: "6", mdx: 14, mdy: 0 }]),
+  m202: () => polList([{ r: 12, deg: 150, t: "z" }, { r: 3, deg: 30, t: "w", c: BLU }, { r: 4, deg: 120, t: "z ÷ w", c: GRN, dl: "120° = 150° − 30°" }]),
+  m203: () => polList([{ r: sq5(2), deg: 45, t: "1 + i", noarc: true }, { r: 2, deg: 30, t: "√3 + i", c: BLU, noarc: true }, { r: 2 * sq5(2), deg: 75, t: "product", c: GRN, dl: "75° = 45° + 30°" }]),
+  dm206: () => polList([{ r: 2, deg: 40, t: "z₁" }, { r: 8, deg: 120, t: "z₁³", c: GRN, dl: "3 × 40° = 120°" }]),
+  dm205: () => cxPlot([{ z: [3, -3], t: "3 − 3i", arc: [0, 315, "315°", 24] }, { z: [0, 5832 ** (1 / 3) * 0 + 6], t: "(3 − 3i)⁶ = 5832 i (direction only)", c: GRN, l: { dx: -4, dy: -10, an: "end" } }], { range: [-6, 6, -4, 7] }),
+  dm208: () => polList([{ r: 2, deg: 30, t: "√3 + i" }, { r: 4, deg: 180, t: "(√3 + i)⁶ = −64 (not to scale)", c: GRN, dl: "6 × 30° = 180°" }].map((q, i) => i ? Object.assign(q, { r: 4 }) : q)),
+  n209: () => argRoots(4, 1.682, 15, { labels: ["z₁", "z₂", "z₃", "z₄"], al: "15°" }),
+  n210: () => argRoots(3, 2, 60, { labels: ["z₁", "z₂", "z₃"], al: "60°" }),
+  n211: () => argRoots(2, 1.414, 60, { labels: ["w₁", "w₂"], al: "60°" }),
+  n212: () => argRoots(3, 1, 0, { labels: ["1", "z₂", "z₃"] }),
+  n213: () => argRoots(4, 2.446, 15.86, { labels: ["z₁", "z₂", "z₃", "z₄"], al: "15.9°" }),
+  n214: () => argRoots(3, 3, 30, { labels: ["z₁", "z₂", "z₃"], al: "30°", step: 1 }),
+  q225: () => spiral(1, [1, 1], ["√2", "√3"]),
+  q226: () => spiral(3, [2, 1.414], ["√13", "√15"]),
+  q228: () => spiral(1, [1, 1, 4], ["√2", "√3", "√19"]),
+  q229: () => spiral(1, [1, 1, 2], ["√2", "√3", "√7"]),
+});
+[[162, 0, "c162"], [163, "c163", "c163s"], [166, 0, "c166"], [167, 0, "c167"], [173, 0, "c173"], [182, 0, "c182"], [183, 0, "c183"], [184, 0, "c184"], [185, 0, "c185"], [188, 0, "c188"],
+ [189, 0, "p189"], [190, 0, "p190"], [191, 0, "p191"], [192, 0, "p192"], [193, 0, "p193"], [194, 0, "p194"], [195, 0, "p195"], [196, 0, "p196"], [197, 0, "p197"], [198, 0, "p198"],
+ [201, 0, "m201"], [202, 0, "m202"], [203, 0, "m203"], [206, 0, "dm206"],
+ [209, 0, "n209"], [210, 0, "n210"], [211, 0, "n211"], [212, 0, "n212"], [213, 0, "n213"], [214, 0, "n214"],
+ [225, 0, "q225"], [226, 0, "q226"], [227, 0, "q225"], [228, 0, "q228"], [229, 0, "q229"]].forEach(([n, g, gs]) => at(n, g || undefined, gs));
+
+
+// ---- function-graph diagrams ----
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+const piLab = (k, d) => { if (k === 0) return "0"; const g = gcd(Math.abs(k), d), n = k / g, m = d / g, sg = n < 0 ? "−" : "", an = Math.abs(n); return sg + (an === 1 ? "" : an) + "π" + (m === 1 ? "" : "/" + m); };
+const radT = (lo, hi, d) => { const o = []; for (let k = Math.round(lo * d); k <= Math.round(hi * d); k++) o.push([k * Math.PI / d, piLab(k, d)]); return o; };
+const degT = (lo, hi, st) => { const o = []; for (let v = lo; v <= hi + 1e-9; v += st) o.push([v, v + "°"]); return o; };
+function gfig(o) {
+  const [x0, x1] = o.x, [y0, y1] = o.y, it = [], ys = o.ys || 1;
+  const xt = o.xt || Array.from({ length: Math.floor(x1) - Math.ceil(x0) + 1 }, (_, i) => [Math.ceil(x0) + i, String(Math.ceil(x0) + i).replace("-", "−")]);
+  xt.forEach(([x]) => it.push({ k: "line", a: [x, y0], b: [x, y1], c: "var(--line)", w: 1 }));
+  for (let y = Math.ceil(y0 / ys) * ys; y <= y1 + 1e-9; y += ys) it.push({ k: "line", a: [x0, y], b: [x1, y], c: "var(--line)", w: 1 });
+  const ax = x0 > 0 ? x0 : x1 < 0 ? x1 : 0, ay = y0 > 0 ? y0 : y1 < 0 ? y1 : 0;
+  it.push({ k: "line", a: [x0, ay], b: [x1, ay], w: 1.5, arrow: true }, { k: "line", a: [ax, y0], b: [ax, y1], w: 1.5, arrow: true });
+  it.push({ k: "txt", p: [x1, ay], t: "x", dx: -2, dy: -8, an: "end", it: true, size: 13, nofit: true }, { k: "txt", p: [ax, y1], t: "y", dx: 10, dy: 8, an: "start", it: true, size: 13, nofit: true });
+  xt.forEach(([x, l]) => { if (Math.abs(x - ax) > 1e-9) it.push({ k: "txt", p: [x, ay], t: l, dy: 14, size: 11, c: MUT, nofit: true }); });
+  for (let y = Math.ceil(y0 / ys) * ys; y <= y1 - 1e-9; y += ys) if (Math.abs(y - ay) > 1e-9 && !o.noy) it.push({ k: "txt", p: [ax, y], t: String(Math.round(y * 100) / 100).replace("-", "−"), dx: -5, dy: 4, an: "end", size: 11, c: MUT, nofit: true });
+  (o.hl || []).forEach((h) => it.push({ k: "line", a: [x0, h.y], b: [x1, h.y], dash: true, c: h.c || ACC, w: 1.5 }, h.t ? { k: "txt", p: [x1, h.y], t: h.t, dx: -4, dy: -6, an: "end", c: h.c || ACC, size: 12, nofit: true } : { k: "txt", p: [0, 0], t: "", nofit: true }));
+  (o.vl || []).forEach((v) => it.push({ k: "line", a: [v.x, y0], b: [v.x, y1], dash: true, c: v.c || MUT, w: 1.3 }, v.t ? { k: "txt", p: [v.x, y1], t: v.t, dx: 4, dy: 12, an: "start", c: v.c || MUT, size: 11, nofit: true } : { k: "txt", p: [0, 0], t: "", nofit: true }));
+  (o.fs || []).forEach((cv) => { const segs = [], N = 500; let cur = []; let prev = null; for (let k = 0; k <= N; k++) { const x = x0 + (x1 - x0) * k / N, y = cv.f(x); if (!isFinite(y) || y < y0 - 0.0001 || y > y1 + 0.0001 || (prev != null && Math.abs(y - prev) > (y1 - y0) * 0.7)) { if (cur.length > 1) segs.push(cur); cur = []; prev = isFinite(y) ? y : null; continue; } cur.push([x, y]); prev = y; } if (cur.length > 1) segs.push(cur); it.push({ k: "path", segs, c: cv.c || BLU, w: cv.w || 2.4, dash: cv.dash }); if (cv.t) it.push({ k: "txt", p: cv.tp, t: cv.t, c: cv.c || BLU, size: 13, an: "start", dx: 4, nofit: true }); });
+  (o.items || []).forEach((x) => it.push(x));
+  (o.pts || []).forEach((p) => it.push({ k: "pt", p: p.p, t: p.t, dx: p.dx == null ? 8 : p.dx, dy: p.dy == null ? -8 : p.dy, an: p.an || "start", c: p.c || ACC, size: 12, tc: INK, nofit: true }));
+  return fig(it, { box: [x0, y0, x1, y1], m: 22, label: "Graph", free: !o.uni });
+}
+const qd = (a, b, c) => (x) => a * x * x + b * x + c;
+const cub = (r1, r2, r3, k) => (x) => k * (x - r1) * (x - r2) * (x - r3);
+const ix = (o) => { // line/curve intersection picture
+  const f = o.f, it = o.items || [], pts = o.pts;
+  return gfig({ x: o.x, y: o.y, fs: [{ f }].filter(() => !!f), items: it.concat(o.circle ? [{ k: "circ", cc: o.circle[0], r: o.circle[1], c: BLU, w: 2.4 }] : []), pts, hl: [] });
+};
+const lineF = (m, c) => (x) => m * x + c;
+const lineItem = (m, c, x0, x1, col) => ({ k: "line", a: [x0, m * x0 + c], b: [x1, m * x1 + c], c: col || ACC, w: 2 });
+const vlineItem = (x, y0, y1) => ({ k: "line", a: [x, y0], b: [x, y1], c: ACC, w: 2 });
+const P_ = (x, y, t, dx, dy, an) => ({ p: [x, y], t, dx, dy, an });
+const circFig = (cc, r, line, pts, b) => gfig({ x: [b[0], b[1]], y: [b[2], b[3]], uni: true, items: [{ k: "circ", cc, r, c: BLU, w: 2.4 }, line], pts });
+Object.assign(D, {
+  // simultaneous equations
+  i41: () => circFig([0, 0], sq5(13), lineItem(1, 1, -5, 4, ACC), [P_(2, 3, "(2, 3)", 8, -8), P_(-3, -2, "(−3, −2)", -8, 16, "end")], [-5, 5, -4.5, 4.5]),
+  i42: () => circFig([2, -1], 5, lineItem(-1, 6, -2, 9), [P_(2, 4, "(2, 4)", -8, -8, "end"), P_(7, -1, "(7, −1)", 8, -8)], [-4, 10, -7, 7]),
+  i43: () => circFig([0, 0], sq5(10), lineItem(-0.5, 2.5, -4, 5), [P_(3, 1, "(3, 1)", 8, -8), P_(-1, 3, "(−1, 3)", -8, -8, "end")], [-4.5, 5, -4, 4.5]),
+  i44: () => circFig([0, 0], sq5(10), lineItem(1, -2, -2, 5), [P_(3, 1, "(3, 1)", 8, -8), P_(-1, -3, "(−1, −3)", -8, 16, "end")], [-4.5, 5, -4.5, 4.5]),
+  i45: () => circFig([0, 0], sq5(10), lineItem(-2, 5, -1, 4), [P_(1, 3, "(1, 3)", 8, -8), P_(3, -1, "(3, −1)", 8, 14)], [-4.5, 5, -4.5, 4.5]),
+  i279: () => circFig([0, 0], 2.5, lineItem(2, -2.5, -0.5, 2.8), [P_(0, -2.5, "(0, −5/2)", -8, 4, "end"), P_(2, 1.5, "(2, 3/2)", 8, -6)], [-3.5, 3.5, -3.5, 3.5]),
+  i280: () => circFig([0, 0], 5, lineItem(-1, 7, 1, 7.5), [P_(3, 4, "(3, 4)", -8, -8, "end"), P_(4, 3, "(4, 3)", 8, -8)], [-6, 8, -6, 6]),
+  i278: () => gfig({ x: [-3.5, 3.5], y: [-9, 11], ys: 2, fs: [{ f: qd(2, 3, -7) }], items: [lineItem(3, 1, -3.4, 3.4)], pts: [P_(2, 7, "(2, 7)", 8, -6), P_(-2, -5, "(−2, −5)", -8, 14, "end")] }),
+  i281: () => gfig({ x: [-1, 6], y: [-4, 8], fs: [{ f: qd(1, -4, 1) }], items: [lineItem(1, -3, -1, 6)], pts: [P_(1, -2, "(1, −2)", -8, 14, "end"), P_(4, 1, "(4, 1)", 8, -8)] }),
+  // completing the square / turning points
+  v31: () => gfig({ x: [-8, 1], y: [-1, 16], ys: 2, fs: [{ f: qd(1, 8, 21) }], pts: [P_(-4, 5, "min (−4, 5)", 8, 18)] , items: [{ k: "line", a: [-4, 0], b: [-4, 5], dash: true, c: MUT }] }),
+  v32: () => gfig({ x: [-2, 6], y: [-8, 20], ys: 4, fs: [{ f: qd(-3, 12, 5) }], pts: [P_(2, 17, "max (2, 17)", 8, -6)], items: [{ k: "line", a: [2, 0], b: [2, 17], dash: true, c: MUT }] }),
+  v34: () => gfig({ x: [-0.5, 6.5], y: [-2, 24], ys: 4, fs: [{ f: qd(2, -12, 23) }], pts: [P_(3, 5, "min (3, 5)", 8, 18)], items: [{ k: "line", a: [3, 0], b: [3, 5], dash: true, c: MUT }] }),
+  v270: () => gfig({ x: [-4, 3], y: [-14, 10], ys: 2, fs: [{ f: qd(2, 5, -9) }], pts: [P_(-1.25, -12.125, "min (−5/4, −97/8)", 8, -6)] }),
+  v271: () => gfig({ x: [-2, 3], y: [-5, 7], fs: [{ f: qd(-2, 2, 5) }], pts: [P_(0.5, 5.5, "max (1/2, 11/2)", 10, -6)] }),
+  v273: () => gfig({ x: [-2, 8], y: [-10, 18], ys: 2, fs: [{ f: (x) => 7 + 6 * x - x * x }], pts: [P_(3, 16, "max (3, 16)", 8, -6)] }),
+  v283: () => gfig({ x: [-6, 1], y: [-8, 2], fs: [{ f: qd(-2, -12, -19) }], pts: [P_(-3, -1, "(−3, −1)", 8, -8), P_(-2, -3, "(−2, −3)", 8, 14)] }),
+  v285: () => gfig({ x: [-1, 5], y: [-10, 6], ys: 2, fs: [{ f: (x) => -3 * (x - 2) ** 2 + 4 }], pts: [P_(2, 4, "max (2, 4)", 8, -6), P_(1, 1, "(1, 1)", -8, 14, "end")] }),
+  v49: () => gfig({ x: [-5, 3], y: [-8, 10], ys: 2, fs: [{ f: qd(-2, -4, 6) }], pts: [P_(-1, 8, "max (−1, 8)", 8, -6), P_(1, 0, "1", 6, 16), P_(-3, 0, "−3", -6, 16, "end")] }),
+  // discriminant pictures
+  dz51: () => gfig({ x: [-0.5, 6.5], y: [-2, 10], fs: [{ f: qd(1, -6, 9) }], pts: [P_(3, 0, "touches at x = 3", 8, -10)] }),
+  dz55: () => gfig({ x: [-2, 3], y: [-2, 12], ys: 2, fs: [{ f: qd(2, -3, 5) }], pts: [P_(0.75, 3.875, "min above the x-axis", 8, -10)] }),
+  dz56: () => gfig({ x: [-4, 4], y: [-12, 12], ys: 2, fs: [{ f: qd(1, 0, 3) }], items: [lineItem(4, -1, -3.2, 3.2), lineItem(-4, -1, -3.2, 3.2, GRN)], pts: [P_(2, 7, "(2, 7)", 8, 14), P_(-2, 7, "(−2, 7)", -8, 14, "end")] }),
+  dz287: () => gfig({ x: [-1, 5], y: [-2, 10], fs: [{ f: qd(1, -4, 5) }], pts: [P_(2, 1, "min (2, 1)", 8, 18)] }),
+  dz289: () => gfig({ x: [-2, 4], y: [-10, 2], fs: [{ f: qd(-1, 2, -3) }], pts: [P_(1, -2, "max (1, −2)", 8, 18)] }),
+  // cubics
+  cb36: () => gfig({ x: [-2, 4], y: [-8, 10], ys: 2, fs: [{ f: cub(-1, 2, 3, 1) }], pts: [P_(-1, 0, "", 0, 0), P_(2, 0, "", 0, 0), P_(3, 0, "", 0, 0)] }),
+  cb40: () => gfig({ x: [-3, 4], y: [-14, 14], ys: 2, fs: [{ f: cub(-2, 0.5, 3, 2) }], pts: [P_(0.5, 0, "½", 0, 14, "middle")] }),
+  cb37: () => gfig({ x: [-4, 3], y: [-12, 16], ys: 4, fs: [{ f: cub(-3, 0.5, 2, 2) }], pts: [P_(0.5, 0, "½", 0, 14, "middle")] }),
+  cb275: () => gfig({ x: [-3, 2], y: [-6, 6], fs: [{ f: cub(-2, -1, 1, 1) }] }),
+  cb282: () => gfig({ x: [-3, 2], y: [-30, 30], ys: 10, fs: [{ f: cub(1, -2, 0.5, 6) }], pts: [P_(0, 6, "(0, 6)", 8, -6)] }),
+  cb284: () => gfig({ x: [-2, 8], y: [-20, 12], ys: 4, fs: [{ f: cub(-1, 3, 7, 1 / 3) }], pts: [P_(0, 7, "(0, 7)", 8, -6)] }),
+});
+[[31,0,"v31"],[32,0,"v32"],[34,0,"v34"],[270,0,"v270"],[271,0,"v271"],[273,0,"v273"],[283,0,"v283"],[285,0,"v285"],[49,0,"v49"],
+ [41,0,"i41"],[42,0,"i42"],[43,0,"i43"],[44,0,"i44"],[45,0,"i45"],[279,0,"i279"],[280,0,"i280"],[278,0,"i278"],[281,0,"i281"],
+ [51,0,"dz51"],[55,0,"dz55"],[56,0,"dz56"],[287,0,"dz287"],[289,0,"dz289"],
+ [36,0,"cb36"],[40,0,"cb40"],[37,0,"cb37"],[275,0,"cb275"],[282,0,"cb282"],[284,0,"cb284"]].forEach(([n, g, gs]) => at(n, g || undefined, gs));
+
+
+// ---- trig graph diagrams ----
+const dsin = (f) => (x) => f(x * Math.PI / 180);
+const PI = Math.PI, deg = (x) => x * PI / 180;
+const tp = (x, y, t, dx, dy, an) => ({ p: [x, y], t, dx, dy, an: an || "middle" });
+const sol = (xs, f, fmt) => xs.map((x, i) => tp(x, f(x), fmt(x, i), 0, i % 2 ? 16 : -10));
+const asy = (xs, lab) => xs.map((x) => ({ x, c: MUT, t: lab ? lab(x) : "" }));
+Object.assign(D, {
+  s72: () => gfig({ x: [0, 360], y: [-1.3, 1.3], ys: 0.5, xt: degT(0, 360, 60), fs: [{ f: dsin(Math.cos) }], hl: [{ y: -0.5, t: "y = −½" }], pts: sol([120, 240], () => -0.5, (x) => x + "°") }),
+  s73: () => gfig({ x: [0, 360], y: [-1.3, 1.3], ys: 0.5, xt: degT(0, 360, 60), fs: [{ f: (x) => Math.cos(deg(x - 30)) }], hl: [{ y: -Math.sqrt(3) / 2, t: "y = −√3/2" }], pts: sol([180, 240], () => -Math.sqrt(3) / 2, (x) => x + "°") }),
+  s75: () => gfig({ x: [0, 360], y: [-1.3, 1.3], ys: 0.5, xt: degT(0, 360, 60), fs: [{ f: (x) => Math.sin(deg(2 * x)) }], hl: [{ y: -Math.sqrt(3) / 2, t: "y = −√3/2" }], pts: sol([120, 150, 300, 330], () => -Math.sqrt(3) / 2, (x) => x + "°") }),
+  s76: () => gfig({ x: [0, 360], y: [-1.3, 1.3], ys: 0.5, xt: degT(0, 360, 60), fs: [{ f: dsin(Math.sin) }], hl: [{ y: -0.5, t: "y = −½" }, { y: 1, t: "y = 1", c: GRN }], pts: [tp(90, 1, "90°", 0, -10), tp(210, -0.5, "210°", 0, 16), tp(330, -0.5, "330°", 0, 16)] }),
+  s304: () => gfig({ x: [0, 360], y: [-0.5, 4.5], ys: 1, xt: degT(0, 360, 60), fs: [{ f: (x) => 2 + 2 * Math.sin(deg(x)) }], hl: [{ y: 1, t: "y = 1" }], pts: sol([210, 330], () => 1, (x) => x + "°") }),
+  s305: () => gfig({ x: [0, 240], y: [-2.5, 2.5], ys: 1, xt: degT(0, 240, 30), fs: [{ f: (x) => 2 * Math.cos(deg(3 * x)) }], hl: [{ y: Math.sqrt(3), t: "y = √3" }], pts: sol([10, 110, 130, 230], () => Math.sqrt(3), (x) => x + "°").map((p) => Object.assign(p, { dy: -10 })) }),
+  s306: () => gfig({ x: [0, 180], y: [-4, 4], ys: 1, xt: degT(0, 180, 30), fs: [{ f: (x) => Math.tan(deg(4 * x)) }], vl: asy([22.5, 67.5, 112.5, 157.5]), hl: [{ y: 1, t: "y = 1" }], pts: sol([11.25, 56.25, 101.25, 146.25], () => 1, (x) => x + "°").map((p) => Object.assign(p, { dy: 18 })) }),
+  s307: () => gfig({ x: [0, 5 * PI], y: [-4.5, 4.5], ys: 1, xt: radT(0, 5, 1), fs: [{ f: (x) => 4 * Math.sin(x / 2) }], hl: [{ y: 2, t: "y = 2" }], pts: [tp(PI / 3, 2, "π/3", 0, -10), tp(5 * PI / 3, 2, "5π/3", 0, -10), tp(13 * PI / 3, 2, "13π/3", 0, -10)] }),
+  s308: () => gfig({ x: [0, 4 * PI], y: [0.5, 5.5], ys: 1, xt: radT(0, 4, 1), fs: [{ f: (x) => 3 + 2 * Math.sin(x) }], hl: [{ y: 2, t: "y = 2" }], pts: [tp(7 * PI / 6, 2, "7π/6", 0, 18), tp(11 * PI / 6, 2, "11π/6", 0, 18), tp(19 * PI / 6, 2, "19π/6", 0, 18), tp(23 * PI / 6, 2, "23π/6", 0, 18)] }),
+  s309: () => gfig({ x: [0, 360], y: [-1.5, 5.5], ys: 1, xt: degT(0, 360, 60), fs: [{ f: (x) => 2 + 3 * Math.sin(deg(2 * x)) }], hl: [{ y: 3, t: "y = 3" }], pts: [tp(9.74, 3, "9.74°", 0, -10), tp(80.26, 3, "80.26°", 0, -10), tp(189.74, 3, "189.74°", 0, -10), tp(260.26, 3, "260.26°", 0, -10)] }),
+  s74: () => gfig({ x: [0, PI], y: [-4, 4], ys: 1, xt: radT(0, 1, 6), fs: [{ f: (x) => Math.tan(3 * x) }], vl: asy([PI / 6, PI / 2, 5 * PI / 6]), hl: [{ y: -1, t: "y = −1" }], pts: [tp(PI / 4, -1, "π/4", 0, 16), tp(7 * PI / 12, -1, "7π/12", 0, 16), tp(11 * PI / 12, -1, "11π/12", 0, 16)] }),
+  s77: () => gfig({ x: [0, PI], y: [-6, 6], ys: 1, xt: radT(0, 1, 4), fs: [{ f: (x) => 5 * Math.cos(4 * x) }], items: [{ k: "line", a: [0, 0], b: [PI / 2, 0], c: ACC, w: 3 }, { k: "txt", p: [PI / 4, 0], t: "one period = π/2", dy: -12, c: ACC, size: 12 }] }),
+  s78: () => gfig({ x: [0, 4 * PI], y: [-4, 4], ys: 1, xt: radT(0, 4, 1), fs: [{ f: (x) => 3 * Math.sin(x / 2) }], hl: [{ y: 2, t: "y = 2" }], pts: [tp(1.459, 2, "", 0, 0), tp(4.824, 2, "", 0, 0)] }),
+  s81: () => gfig({ x: [0, 2 * PI], y: [-4, 4], ys: 1, xt: radT(0, 2, 2), fs: [{ f: (x) => 3 * Math.sin(2 * x) }] }),
+  s310: () => gfig({ x: [0, 2 * PI], y: [-3, 3.5], ys: 1, xt: radT(0, 2, 2), fs: [{ f: (x) => -2 * Math.cos(x), c: BLU, t: "g", tp: [PI * 1.55, -1.6] }, { f: (x) => 2 + Math.cos(x), c: ACC, t: "m", tp: [PI * 0.45, 2.45] }] }),
+  s311: () => gfig({ x: [0, 2 * PI], y: [2, 4], ys: 0.5, xt: radT(0, 2, 2), fs: [{ f: (x) => 3 + 0.5 * Math.sin(2 * x) }], hl: [{ y: 3, c: MUT }] }),
+  s312: () => gfig({ x: [0, 3 * PI], y: [2.5, 5.5], ys: 0.5, xt: radT(0, 3, 2), fs: [{ f: (x) => 4 - Math.sin(2 * x / 3) }], hl: [{ y: 4, c: MUT }] }),
+  s313: () => gfig({ x: [0, 6 * PI], y: [-11, 3], ys: 2, xt: radT(0, 6, 1), fs: [{ f: (x) => -4 + 6 * Math.sin(x / 3) }], hl: [{ y: -4, c: MUT }] }),
+  s314: () => gfig({ x: [-3 * PI / 2 - 0.3, 3 * PI / 2 + 0.3], y: [-4, 4], ys: 1, xt: radT(-1.5, 1.5, 2), fs: [{ f: Math.tan }], vl: asy([-3 * PI / 2, -PI / 2, PI / 2, 3 * PI / 2]) }),
+  s315: () => gfig({ x: [-PI, PI], y: [-4, 4], ys: 1, xt: radT(-1, 1, 6), fs: [{ f: (x) => Math.tan(1.5 * x) }], vl: asy([-PI, -PI / 3, PI / 3, PI], (x) => piLab(Math.round(x * 3 / PI), 3)), pts: [tp(PI / 6, 1, "(π/6, 1)", 10, -8, "start")] }),
+  s316: () => gfig({ x: [-PI, PI], y: [-4, 4], ys: 1, xt: radT(-1, 1, 2), fs: [{ f: (x) => Math.tan(x + PI / 2) }], vl: asy([-PI, 0, PI]), pts: [tp(-PI / 2, 0, "", 0, 0), tp(PI / 2, 0, "", 0, 0)] }),
+});
+[[72,0,"s72"],[73,0,"s73"],[75,0,"s75"],[76,0,"s76"],[304,0,"s304"],[305,0,"s305"],[306,0,"s306"],[307,0,"s307"],[308,0,"s308"],[309,0,"s309"],[74,0,"s74"],
+ [77,0,"s77"],[78,0,"s78"],[81,0,"s81"],[310,0,"s310"],[311,0,"s311"],[312,0,"s312"],[313,0,"s313"],[314,0,"s314"],[315,0,"s315"],[316,0,"s316"]].forEach(([n, g, gs]) => at(n, g || undefined, gs));
+
+// ---- new questions that come with their own diagram ----
+Object.assign(D, {
+  nq1: () => gfig({ x: [-2.5, 4.5], y: [-5.5, 4], ys: 1, fs: [{ f: qd(1, -2, -3) }], pts: [tp(1, -4, "(1, −4)", 10, 16, "start"), tp(0, -3, "(0, −3)", -8, 18, "end")] }),
+  nq2: () => gfig({ x: [-PI / 2 - 0.2, PI / 2 + 0.2], y: [-4, 4], ys: 1, xt: radT(-0.5, 0.5, 6).filter((t) => Math.abs(t[0]) > 1e-9), fs: [{ f: (x) => Math.tan(3 * x) }], vl: asy([-PI / 6, PI / 6], (x) => (x < 0 ? "−" : "") + "π/6"), pts: [tp(PI / 12, 1, "(π/12, 1)", 10, -8, "start")] }),
+  nq3: () => cxPlot([{ z: [3, 2], t: "z", drop: true }], { range: [-4, 5, -4, 5] }),
+  nq4: () => cxPlot([{ z: [-2, 2], t: "z", drop: true }], { range: [-4, 3, -3, 4] }),
+  nq5: () => cxPlot([{ z: pol([0, 0], 2, 40), t: "z₁", mod: "2", arc: [0, 40, "40°", 40] }], { range: [-3, 3, -3, 3] }),
+  nq5s: () => argRoots(3, 2, 40, { labels: ["z₁", "z₂", "z₃"], al: "40°" }),
+  nq6: () => { const A = [0, 0], B = [10, 0], C = triSSS(7, 8, 10)[2]; return tri([[0, 0], [10, 0], pol([0, 0], 8, 35)], { names: ["A", "B", "C"], sides: ["?", "8 km", "10 km"], angs: ["35°", null, null] }); },
+});
+PROBLEMS.push(
+{ t: "graphs", g: "nq1", q: `The graph of a quadratic function is shown. It has its turning point at (1, −4) and crosses the y-axis at (0, −3). Find its equation in the form y = x² + bx + c, and find where it crosses the x-axis.`, s: ["Turning point (1, −4): y = (x − 1)² − 4", "Expand: y = x² − 2x − 3; check (0, −3) ✓", "Roots: (x − 3)(x + 1) = 0"], a: "y = x² − 2x − 3; crosses the x-axis at x = −1 and x = 3" },
+{ t: "tgraph", g: "nq2", q: `The graph shows part of y = tan(cx), where c > 0. The vertical asymptotes shown are x = ±${F("π", "6")} and the curve passes through the point (${F("π", "12")}, 1). Find the value of c, and the period of the function.`, s: ["Asymptotes of tan(cx) occur when cx = ±π/2, so c(π/6) = π/2", "c = 3; check: tan(3 · π/12) = tan(π/4) = 1 ✓", "Period = π/c"], a: `c = 3; period ${F("π", "3")}` },
+{ t: "cxtrans", g: "nq3", q: `The Argand diagram shows the complex number z. (i) Write z in the form a + bi. (ii) Find iz and plot it on the diagram. (iii) Describe the transformation that maps z to iz.`, s: ["From the diagram, z = 3 + 2i", "iz = 3i + 2i² = −2 + 3i", "The point moves from (3, 2) to (−2, 3), a quarter-turn about the origin"], gs: "nq3s", a: "z = 3 + 2i; iz = −2 + 3i; a rotation of 90° anticlockwise about the origin" },
+{ t: "topolar", g: "nq4", q: `The Argand diagram shows the complex number z. Write z in rectangular form and then in polar form, giving the angle in degrees.`, s: ["z = −2 + 2i, so |z| = √(4 + 4) = 2√2", "z is in the second quadrant with reference angle 45°, so arg z = 180° − 45° = 135°"], gs: "nq4s", a: "z = −2 + 2i = 2√2(cos 135° + i sin 135°)" },
+{ t: "nthroots", g: "nq5", q: `The Argand diagram shows z₁ = 2(cos 40° + i sin 40°), which is one of the three cube roots of a complex number w. Find w in polar form, and find the other two cube roots.`, s: ["w = z₁³ = 2³(cos 120° + i sin 120°)", "The roots are equally spaced 360° ÷ 3 = 120° apart on a circle of radius 2", "z₂ at 40° + 120° = 160°; z₃ at 160° + 120° = 280°"], gs: "nq5s", a: "w = 8(cos 120° + i sin 120°); z₂ = 2(cos 160° + i sin 160°), z₃ = 2(cos 280° + i sin 280°)" },
+{ t: "rules", g: "nq6", q: `Two walkers set out from A. The first walks 10 km to B. The second walks 8 km to C so that ∠BAC = 35°. How far apart are the walkers when both have stopped, to the nearest tenth of a km, and what is the area of triangle ABC?`, s: ["Cosine rule: |BC|² = 10² + 8² − 2(10)(8)cos 35°", "= 164 − 131.06 = 32.94", "Area = ½(10)(8) sin 35°"], a: "|BC| ≈ 5.7 km; area ≈ 22.9 km²" }
+);
+Object.assign(D, {
+  nq3s: () => cxPlot([{ z: [3, 2], t: "z", arc: [0, 33.69, "", 30] }, { z: [-2, 3], t: "iz", c: GRN, arc: [33.69, 123.69, "90°", 44] }], { range: [-4, 5, -4, 5] }),
+  nq4s: () => argPolar(-2, 2, { rl: "2√2", tl: "135°", zl: "z", drop: true }),
+});
+
 PROBLEMS.forEach((p, i) => (p.id = "p" + (i + 1)));
 
 
@@ -665,6 +1782,129 @@ const deckTypes = () => TYPES.filter((t) => S.sel.has(t.id));
 const deckProblems = () => PROBLEMS.filter((p) => S.sel.has(p.t));
 const accepted = (p) => [p.t, ...(p.also || [])];
 
+// ================= drawing toolkit (diagrams) =================
+const INK = "var(--ink)", ACC = "var(--tr)", BLU = "var(--a1)", GRN = "var(--a2)", MUT = "var(--muted)", LNS = "var(--line-strong)";
+const rad = (d) => d * Math.PI / 180, degOf = (r) => r * 180 / Math.PI;
+const pol = (c, r, d) => [c[0] + r * Math.cos(rad(d)), c[1] + r * Math.sin(rad(d))];
+const nf = (v) => v.toFixed(1);
+function fig(items, o = {}) {
+  const W = o.w || 420, H = o.h || 260, M = o.m == null ? 30 : o.m;
+  const xs = [], ys = []; const add = (p) => { xs.push(p[0]); ys.push(p[1]); };
+  items.forEach((it) => {
+    if (it.segs) it.segs.forEach((sg) => sg.forEach(add)); if (it.a) add(it.a); if (it.b) add(it.b); if (it.p && !it.nofit) add(it.p); if (it.pts) it.pts.forEach(add);
+    if (it.k === "arc" || it.k === "sector") { for (let a = it.a0; a <= it.a1 + 1e-9; a += Math.max(2, (it.a1 - it.a0) / 60)) add(pol(it.cc, it.r, a)); add(it.cc); }
+    if (it.k === "circ") { add([it.cc[0] - it.r, it.cc[1] - it.r]); add([it.cc[0] + it.r, it.cc[1] + it.r]); }
+  });
+  let x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  if (o.box) [x0, y0, x1, y1] = o.box;
+  const s = Math.min((W - 2 * M) / ((x1 - x0) || 1), (H - 2 * M) / ((y1 - y0) || 1));
+  const sx = o.free ? (W - 2 * M) / ((x1 - x0) || 1) : s, sy = o.free ? (H - 2 * M) / ((y1 - y0) || 1) : s;
+  const ox = (W - sx * (x1 - x0)) / 2, oy = (H - sy * (y1 - y0)) / 2;
+  const T = (p) => [ox + (p[0] - x0) * sx, H - oy - (p[1] - y0) * sy];
+  let out = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${o.label || "Diagram for this problem"}" style="font-family:var(--math)"><defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="context-stroke"/></marker></defs>`;
+  const dash = (d) => d ? ` stroke-dasharray="${d === true ? "5 4" : d}"` : "";
+  items.forEach((it) => {
+    const c = it.c || INK, w = it.w || 1.8;
+    switch (it.k) {
+      case "line": { const a = T(it.a), b = T(it.b); out += `<line x1="${nf(a[0])}" y1="${nf(a[1])}" x2="${nf(b[0])}" y2="${nf(b[1])}" stroke="${c}" stroke-width="${w}"${dash(it.dash)}${it.arrow ? ' marker-end="url(#ah)"' : ""}/>`; break; }
+      case "path": it.segs.forEach((sg) => { out += `<polyline points="${sg.map((p) => T(p).map(nf).join(",")).join(" ")}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"${dash(it.dash)}/>`; }); break;
+      case "poly": out += `<polygon points="${it.pts.map((p) => T(p).map(nf).join(",")).join(" ")}" fill="${it.fill || "none"}" stroke="${it.stroke || c}" stroke-width="${w}" stroke-linejoin="round"${dash(it.dash)}/>`; break;
+      case "circ": { const p = T(it.cc); out += `<circle cx="${nf(p[0])}" cy="${nf(p[1])}" r="${nf(it.r * s)}" fill="${it.fill || "none"}" stroke="${c}" stroke-width="${w}"${dash(it.dash)}/>`; break; }
+      case "arc": case "sector": {
+        const p0 = T(pol(it.cc, it.r, it.a0)), p1 = T(pol(it.cc, it.r, it.a1)), r = it.r * s, large = it.a1 - it.a0 > 180 ? 1 : 0, cc = T(it.cc);
+        const arcp = `A${nf(r)},${nf(r)} 0 ${large} 0 ${nf(p1[0])},${nf(p1[1])}`;
+        if (it.k === "arc") out += `<path d="M${nf(p0[0])},${nf(p0[1])} ${arcp}" fill="none" stroke="${c}" stroke-width="${w}"${dash(it.dash)}/>`;
+        else out += `<path d="M${nf(cc[0])},${nf(cc[1])} L${nf(p0[0])},${nf(p0[1])} ${arcp} Z" fill="${it.fill || "none"}" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"/>`;
+        break; }
+      case "ang": { const v = T(it.v), r = it.r || 20; const a0 = rad(it.a0), a1 = rad(it.a1);
+        const p0 = [v[0] + r * Math.cos(a0), v[1] - r * Math.sin(a0)], p1 = [v[0] + r * Math.cos(a1), v[1] - r * Math.sin(a1)];
+        out += `<path d="M${nf(p0[0])},${nf(p0[1])} A${r},${r} 0 ${it.a1 - it.a0 > 180 ? 1 : 0} 0 ${nf(p1[0])},${nf(p1[1])}" fill="none" stroke="${it.c || ACC}" stroke-width="1.6"/>`;
+        if (it.t) { const m = rad((it.a0 + it.a1) / 2), rr = r + (it.tr == null ? 13 : it.tr); out += `<text x="${nf(v[0] + rr * Math.cos(m))}" y="${nf(v[1] - rr * Math.sin(m) + 4)}" font-size="${it.size || 13}" text-anchor="middle" fill="${it.c || ACC}">${it.t}</text>`; }
+        break; }
+      case "rt": { const v = T(it.v), sz = it.sz || 10, a = rad(it.a0), b = rad(it.a0 + 90);
+        const p = [[v[0] + sz * Math.cos(a), v[1] - sz * Math.sin(a)], [v[0] + sz * (Math.cos(a) + Math.cos(b)), v[1] - sz * (Math.sin(a) + Math.sin(b))], [v[0] + sz * Math.cos(b), v[1] - sz * Math.sin(b)]];
+        out += `<polyline points="${p.map((q) => q.map(nf).join(",")).join(" ")}" fill="none" stroke="${INK}" stroke-width="1.3"/>`; break; }
+      case "pt": { const p = T(it.p); if (it.dot !== false) out += `<circle cx="${nf(p[0])}" cy="${nf(p[1])}" r="${it.r || 3.4}" fill="${it.c || ACC}"/>`;
+        if (it.t) out += `<text x="${nf(p[0] + (it.dx == null ? 8 : it.dx))}" y="${nf(p[1] + (it.dy == null ? -8 : it.dy))}" font-size="${it.size || 14}" text-anchor="${it.an || "start"}"${it.it ? ' font-style="italic"' : ""} fill="${it.tc || INK}">${it.t}</text>`; break; }
+      case "txt": { const p = T(it.p); out += `<text x="${nf(p[0] + (it.dx || 0))}" y="${nf(p[1] + (it.dy || 0))}" font-size="${it.size || 14}" text-anchor="${it.an || "middle"}"${it.it ? ' font-style="italic"' : ""} fill="${c}">${it.t}</text>`; break; }
+    }
+  });
+  return out + "</svg>";
+}
+// ----- triangles -----
+function triSSS(a, b, c) { const cA = (b * b + c * c - a * a) / (2 * b * c), A = Math.acos(cA); return [[0, 0], [c, 0], [b * Math.cos(A), b * Math.sin(A)]]; }
+function triSAS(b, Adeg, c) { return [[0, 0], [c, 0], [b * Math.cos(rad(Adeg)), b * Math.sin(rad(Adeg))]]; }
+function triASA(Adeg, c, Bdeg) { const C = 180 - Adeg - Bdeg, b = c * Math.sin(rad(Bdeg)) / Math.sin(rad(C)); return [[0, 0], [c, 0], [b * Math.cos(rad(Adeg)), b * Math.sin(rad(Adeg))]]; }
+function triItems(P, o = {}) {
+  const nm = o.names || ["A", "B", "C"], it = [{ k: "poly", pts: P, fill: o.fill || "rgba(85,117,99,.08)" }];
+  const cen = [(P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3];
+  const out = (p, d) => { const v = [p[0] - cen[0], p[1] - cen[1]], L = Math.hypot(v[0], v[1]) || 1; return [v[0] / L * d, -v[1] / L * d]; };
+  P.forEach((p, i) => { if (nm[i]) { const d = out(p, 14); it.push({ k: "txt", p, t: nm[i], dx: d[0], dy: d[1] + 5, it: true, size: 16 }); } });
+  const pr = [[1, 2], [2, 0], [0, 1]];
+  (o.sides || []).forEach((t, i) => { if (t == null) return; const [a, b] = pr[i], m = [(P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2], d = out(m, 15); it.push({ k: "txt", p: m, t, dx: d[0], dy: d[1] + 5, c: o.sc || ACC, size: 14 }); });
+  (o.angs || []).forEach((t, i) => { if (t == null) return; const v = P[i], p1 = P[(i + 1) % 3], p2 = P[(i + 2) % 3];
+    let a0 = degOf(Math.atan2(p1[1] - v[1], p1[0] - v[0])), a1 = degOf(Math.atan2(p2[1] - v[1], p2[0] - v[0])); let d = ((a1 - a0) % 360 + 360) % 360; if (d > 180) { const x = a0; a0 = a1; a1 = x; d = 360 - d; } a1 = a0 + d;
+    it.push({ k: "ang", v, a0, a1, r: o.ar || 22, t: t === true ? "" : t }); });
+  return it;
+}
+const tri = (P, o) => fig(triItems(P, o), o && o.fo);
+// ----- sectors -----
+function sectorFig(o) { // o: r, deg, rl, al, arcl, shade, extra
+  const r = o.r || 1, d = o.deg, a0 = 90 - d / 2, a1 = 90 + d / 2, O = [0, 0], A = pol(O, r, a0), B = pol(O, r, a1);
+  const it = [{ k: "sector", cc: O, r, a0, a1, fill: o.fill || "rgba(185,91,60,.10)", w: 1.6 }, { k: "arc", cc: O, r, a0, a1, c2: 0, w: 2.6, c: ACC }];
+  it.push({ k: "line", a: O, b: A, w: 1.8 }, { k: "line", a: O, b: B, w: 1.8 });
+  it.push({ k: "pt", p: O, t: o.O === false ? "" : "O", dx: -4, dy: 16, it: true });
+  if (o.rl) { const m = pol(O, r * .55, a1); it.push({ k: "txt", p: m, t: o.rl, dx: -14, dy: -4, c: ACC }); }
+  if (o.al) it.push({ k: "ang", v: O, a0, a1, r: Math.min(30, 120 / (1 + 0 * r)), t: o.al, tr: 12 });
+  if (o.arcl) { const m = pol(O, r, 90); it.push({ k: "txt", p: m, t: o.arcl, dy: -9, c: ACC }); }
+  if (o.pts) { it.push({ k: "pt", p: A, t: o.pts[0], dx: 8, dy: 4, it: true, c: INK }, { k: "pt", p: B, t: o.pts[1], dx: -16, dy: 4, it: true, c: INK }); }
+  return fig(it.concat(o.extra || []), { m: 34 });
+}
+// ----- oblique 3D -----
+const P3 = (x, y, z) => [x + 0.42 * y, z + 0.30 * y];
+function boxItems(w, d, h, o = {}) {
+  const v = (x, y, z) => P3(x, y, z), E = (a, b, hid) => ({ k: "line", a: v(...a), b: v(...b), dash: hid, c: hid ? MUT : INK, w: hid ? 1.3 : 1.8 });
+  const it = [E([0, 0, 0], [w, 0, 0]), E([w, 0, 0], [w, d, 0]), E([0, 0, 0], [0, 0, h]), E([w, 0, 0], [w, 0, h]), E([w, d, 0], [w, d, h]), E([0, 0, h], [w, 0, h]), E([w, 0, h], [w, d, h]), E([w, d, h], [0, d, h]), E([0, d, h], [0, 0, h]),
+    E([0, d, 0], [w, d, 0], 1), E([0, 0, 0], [0, d, 0], 1), E([0, d, 0], [0, d, h], 1)];
+  return it;
+}
+function pyrItems(w, d, apexH, o = {}) {
+  const v = (x, y, z) => P3(x, y, z), ap = [w / 2, d / 2, apexH], E = (a, b, hid) => ({ k: "line", a: v(...a), b: v(...b), dash: hid, c: hid ? MUT : INK, w: hid ? 1.3 : 1.8 });
+  return [E([0, 0, 0], [w, 0, 0]), E([w, 0, 0], [w, d, 0]), E([0, 0, 0], ap), E([w, 0, 0], ap), E([w, d, 0], ap), E([0, d, 0], [w, d, 0], 1), E([0, 0, 0], [0, d, 0], 1), E([0, d, 0], ap, 1)];
+}
+// ----- Argand diagrams -----
+function argand(o) { // o: range[xmin,xmax,ymin,ymax], pts[{z,t,c,dx,dy,vec,dot}], items[], step
+  const [xa, xb, ya, yb] = o.range, st = o.step || 1, it = [];
+  for (let x = Math.ceil(xa / st) * st; x <= xb + 1e-9; x += st) { if (Math.abs(x) > 1e-9) it.push({ k: "line", a: [x, ya], b: [x, yb], c: "var(--line)", w: 1 }); }
+  for (let y = Math.ceil(ya / st) * st; y <= yb + 1e-9; y += st) { if (Math.abs(y) > 1e-9) it.push({ k: "line", a: [xa, y], b: [xb, y], c: "var(--line)", w: 1 }); }
+  it.push({ k: "line", a: [xa, 0], b: [xb, 0], arrow: true, w: 1.5 }, { k: "line", a: [0, ya], b: [0, yb], arrow: true, w: 1.5 });
+  it.push({ k: "txt", p: [xb, 0], t: "Re", dx: -4, dy: 16, an: "end", it: true, size: 13, nofit: true }, { k: "txt", p: [0, yb], t: "Im", dx: 12, dy: 6, an: "start", it: true, size: 13, nofit: true });
+  for (let x = Math.ceil(xa / st) * st; x <= xb - st + 1e-9; x += st) if (Math.abs(x) > 1e-9) it.push({ k: "txt", p: [x, 0], t: String(Math.round(x * 100) / 100).replace("-", "−"), dy: 14, size: 11, c: MUT, nofit: true });
+  for (let y = Math.ceil(ya / st) * st; y <= yb - st + 1e-9; y += st) if (Math.abs(y) > 1e-9) it.push({ k: "txt", p: [0, y], t: String(Math.round(y * 100) / 100).replace("-", "−"), dx: -6, dy: 4, an: "end", size: 11, c: MUT, nofit: true });
+  (o.items || []).forEach((x) => it.push(x));
+  (o.pts || []).forEach((p) => { if (p.vec) it.push({ k: "line", a: [0, 0], b: p.z, c: p.c || BLU, arrow: true, w: 1.6 }); it.push({ k: "pt", p: p.z, t: p.t, c: p.c || ACC, dx: p.dx, dy: p.dy, an: p.an, it: true, size: 14, tc: p.c || INK, dot: p.dot, nofit: true }); });
+  return fig(it, { box: [xa, ya, xb, yb], m: 12, label: "Argand diagram", w: o.w, h: o.h });
+}
+function argPolar(re, im, o = {}) {
+  const R = Math.hypot(re, im), m = Math.max(Math.abs(re), Math.abs(im), 1), pad = Math.ceil(m) + 1;
+  const th = ((degOf(Math.atan2(im, re)) % 360) + 360) % 360, items = [];
+  items.push({ k: "line", a: [0, 0], b: [re, im], dash: true, c: ACC, w: 1.6 });
+  if (th > 0.5) items.push({ k: "ang", v: [0, 0], a0: 0, a1: th, r: 26, t: o.tl || "θ", c: ACC, tr: 11 });
+  const mid = [re / 2, im / 2];
+  if (o.rl) items.push({ k: "txt", p: mid, t: o.rl, dx: im >= 0 && re >= 0 ? -12 : 12, dy: -8, c: ACC, size: 13, nofit: true });
+  if (o.drop) items.push({ k: "line", a: [re, 0], b: [re, im], dash: true, c: MUT, w: 1.1 }, { k: "line", a: [0, im], b: [re, im], dash: true, c: MUT, w: 1.1 });
+  return argand({ range: [-pad, pad, -pad, pad], step: pad > 6 ? 2 : 1, items, pts: [{ z: [re, im], t: o.zl || "z", dx: re >= 0 ? 9 : -9, dy: im >= 0 ? -9 : 17 }].map((p) => { if (re < 0) p.an = "end"; return p; }) });
+}
+function argRoots(n, r, th0, o = {}) {
+  const pad = Math.ceil(r) + 1, items = [{ k: "circ", cc: [0, 0], r, dash: true, c: LNS, w: 1.3 }], pts = [], P = [];
+  for (let k = 0; k < n; k++) { const a = th0 + 360 * k / n; P.push(pol([0, 0], r, a)); }
+  items.push({ k: "poly", pts: P, fill: "rgba(85,117,99,.08)", c: GRN, w: 1.5, dash: "4 3" });
+  P.forEach((p, k) => { items.push({ k: "line", a: [0, 0], b: p, c: MUT, w: 1 }); const a = th0 + 360 * k / n; pts.push({ z: p, t: (o.labels && o.labels[k]) || "", dx: p[0] >= 0 ? 8 : -8, dy: p[1] >= 0 ? -8 : 16, c: k === 0 ? ACC : BLU }); });
+  if (th0 > 0.5) items.push({ k: "ang", v: [0, 0], a0: 0, a1: th0, r: 30, t: o.al || (th0 + "°"), c: ACC, tr: 12 });
+  return argand({ range: [-pad, pad, -pad, pad], step: o.step || (pad > 6 ? 2 : 1), items, pts: pts.map((p) => { p.an = p.dx < 0 ? "end" : "start"; return p; }) });
+}
+
+const drawing = (k) => (typeof D !== "undefined" && D[k]) ? D[k]() : graphSVG(k);
 // ================= graphs =================
 function graphSVG(key) {
   const g = G[key]; const W = 420, H = 260, pad = 30;
@@ -693,12 +1933,13 @@ function rng(a, b, st) { const o = []; for (let v = a; v <= b + 1e-9; v += st) o
 
 // ================= helpers =================
 const typeChip = (id) => `<span class="typechip"><i style="background:${CH_COL[TYPE[id].ch]}"></i>${TYPE[id].name}</span>`;
-const solHTML = (p) => `<div class="solution">${p.s.map((l) => `<div>${l}</div>`).join("")}<div class="ans">${p.a}</div></div>`;
-const qBody = (p) => `<div class="qtext">${p.q}</div>${p.g ? `<div class="graph">${graphSVG(p.g)}</div>` : ""}`;
+const solHTML = (p) => `<div class="solution">${p.s.map((l) => `<div>${l}</div>`).join("")}${p.gs ? `<div class="graph" style="margin:10px auto">${drawing(p.gs)}</div>` : ""}<div class="ans">${p.a}</div></div>`;
+const qBody = (p) => `<div class="qtext">${p.q}</div>${p.g ? `<div class="graph">${drawing(p.g)}</div>` : ""}`;
 const view = () => document.getElementById("view");
 function go(hash) { if (location.hash !== "#" + hash) location.hash = hash; else route(); }
 
 // ================= HOME =================
+const groupsOf = (ts) => { const gs = []; ts.forEach((t) => { const n = t.grp || ""; let g = gs.find((x) => x.name === n); if (!g) { g = { name: n, ts: [] }; gs.push(g); } g.ts.push(t); }); return gs; };
 const countOf = (id) => PROBLEMS.filter((p) => p.t === id).length;
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 function home() {
@@ -707,8 +1948,8 @@ function home() {
     const ts = TYPES.filter((t) => t.ch === s.id);
     return `<div class="strand" style="--sc:${s.color}">
       <div class="strandhead"><button class="strandtoggle" type="button" data-open="${s.id}" aria-expanded="${S.open.has(s.id)}"><span class="chev" aria-hidden="true">▸</span><h3>${s.id}</h3><small data-count="${s.id}"></small></button><button class="btn strandall" type="button" data-strand="${s.id}" aria-pressed="false"></button></div>
-      <div class="topics" ${S.open.has(s.id) ? "" : "hidden"}>${ts.map((t) => `<button class="topic" type="button" data-t="${t.id}" aria-pressed="false">
-        <span class="box" aria-hidden="true">✓</span><span class="tn">${t.name}<span class="tc">${plural(countOf(t.id), "problem")}</span></span></button>`).join("")}</div>
+      <div class="topicwrap" ${S.open.has(s.id) ? "" : "hidden"}>${groupsOf(ts).map((g) => `${g.name ? `<h4 class="grp">${g.name}</h4>` : ""}<div class="topics">${g.ts.map((t) => `<button class="topic" type="button" data-t="${t.id}" aria-pressed="false">
+        <span class="box" aria-hidden="true">✓</span><span class="tn"><span>${t.name}</span><span class="tc">${plural(countOf(t.id), "problem")}</span></span></button>`).join("")}</div>`).join("")}</div>
     </div>`;
   };
   const modes = MODES.map((m) => `<button class="mode" type="button" data-mode="${m.id}" aria-pressed="false"><strong>${m.name}</strong><span class="muted" style="font-size:15px">${m.desc}</span><span class="muted" style="font-size:13px" data-modenote="${m.id}"></span></button>`).join("");
@@ -748,7 +1989,7 @@ function home() {
   view().querySelectorAll("[data-strand]").forEach((b) => b.onclick = () => { const ids = TYPES.filter((t) => t.ch === b.dataset.strand).map((t) => t.id); toggle(ids, !ids.every((id) => S.sel.has(id))); });
   view().querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
     const id = b.dataset.open; const open = !S.open.has(id); open ? S.open.add(id) : S.open.delete(id);
-    b.setAttribute("aria-expanded", open); b.closest(".strand").querySelector(".topics").hidden = !open;
+    b.setAttribute("aria-expanded", open); b.closest(".strand").querySelector(".topicwrap").hidden = !open;
   });
   document.getElementById("selall").onclick = () => toggle(TYPES.map((t) => t.id), true);
   document.getElementById("clearall").onclick = () => toggle(TYPES.map((t) => t.id), false);
@@ -899,7 +2140,7 @@ function itemHTML(p, r, label) {
       <div class="meta">${label ? `<b class="muted">${label}</b>` : typeChip(p.t)}<span class="row" style="gap:8px">${r ? `<span class="mark ${r.ok ? "ok" : "no"}">${r.ok ? "✓ Correct" : "✗ Missed"}</span>` : ""}
         <button class="btn starbtn" type="button" data-star="${p.id}" aria-pressed="${isStarred(p.id)}" style="padding:5px 10px;font-size:14px">${isStarred(p.id) ? "★ Saved" : "☆ Practise"}</button>
         <button class="btn" type="button" data-sol="${p.id}" aria-expanded="false" style="padding:5px 10px;font-size:14px">Solution</button></span></div>
-      <div class="qt">${p.q}</div>${p.g ? `<div class="graph" style="max-width:320px">${graphSVG(p.g)}</div>` : ""}
+      <div class="qt">${p.q}</div>${p.g ? `<div class="graph" style="max-width:320px">${drawing(p.g)}</div>` : ""}
       <div data-solbox="${p.id}" hidden>${solHTML(p)}</div>
     </article>`;
 }
@@ -918,10 +2159,12 @@ function library() {
   const nIn = (sid) => PROBLEMS.filter((p) => TYPE[p.t].ch === sid).length;
   const tabs = strands.map((s) => `<button class="tab" type="button" role="tab" data-s="${s.id}" aria-selected="${s.id === st.id}" style="--sc:${s.color}"><b>${s.id}</b><span>${plural(TYPES.filter((t) => t.ch === s.id).length, "topic")} · ${plural(nIn(s.id), "problem")}</span></button>`).join("");
   const chips = [`<button class="chip" type="button" data-f="all" aria-pressed="${S.libTopic === "all"}">All ${st.id} (${nIn(st.id)})</button>`]
-    .concat(ts.map((t) => `<button class="chip" type="button" data-f="${t.id}" aria-pressed="${S.libTopic === t.id}">${t.name} (${countOf(t.id)})</button>`)).join("");
+    .concat(groupsOf(ts).map((g) => (g.name ? `<span class="grplabel">${g.name}</span>` : "") + g.ts.map((t) => `<button class="chip" type="button" data-f="${t.id}" aria-pressed="${S.libTopic === t.id}">${t.name} (${countOf(t.id)})</button>`).join(""))).join("");
+  let lastGrp = null;
   const groups = ts.filter((t) => S.libTopic === "all" || t.id === S.libTopic).map((t) => {
     const ps = PROBLEMS.filter((p) => p.t === t.id);
-    return `<section class="tgroup" style="--sc:${st.color}"><h2>${t.name}<small>${plural(ps.length, "problem")}</small></h2>
+    const band = t.grp && t.grp !== lastGrp && S.libTopic === "all" ? `<h3 class="grpband" style="--sc:${st.color}">${t.grp}</h3>` : ""; lastGrp = t.grp || null;
+    return `${band}<section class="tgroup" style="--sc:${st.color}"><h2>${t.name}<small>${plural(ps.length, "problem")}</small></h2>
       <p class="muted" style="font-size:15px"><b>The giveaway:</b> ${t.clue}</p>
       <div class="list">${ps.map((p, k) => itemHTML(p, null, `Problem ${k + 1}`)).join("")}</div></section>`;
   }).join("");
